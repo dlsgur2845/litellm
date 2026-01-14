@@ -8579,6 +8579,50 @@ async def login(request: Request):  # noqa: PLR0915
     # Generate JWT token
     import jwt
 
+    # Add JTI and Expiry
+    token_expiry_minutes = int(os.getenv("LITELLM_TOKEN_EXPIRY_MINUTES", "60"))
+    expiry_time = datetime.utcnow() + timedelta(minutes=token_expiry_minutes)
+    jti = str(uuid.uuid4())
+
+    returned_ui_token_object["exp"] = int(expiry_time.timestamp())
+    returned_ui_token_object["jti"] = jti
+
+    # Update DB with active JTI
+    # Use user_id from login_result (which came from authenticate_user)
+    try:
+        if prisma_client is not None and login_result.user_id:
+           # We need to fetch current metadata first or use update with deep merge if supported, 
+           # but Prisma update usually replaces JSON. 
+           # Ideally we should read-modify-write or use a safe update method.
+           # Typically we store simple k-v in metadata. 
+           # Let's try to update just the field if possible or get first.
+           # To be safe and quick, we can fetch, update dict, and save.
+           
+           user_in_db = await prisma_client.db.litellm_usertable.find_unique(
+                where={"user_id": login_result.user_id}
+           )
+           
+           if user_in_db:
+                current_metadata = user_in_db.metadata or {}
+                # Ensure it's a dict
+                if isinstance(current_metadata, str):
+                    try:
+                        current_metadata = json.loads(current_metadata)
+                    except:
+                        current_metadata = {}
+                elif not isinstance(current_metadata, dict):
+                    current_metadata = {}
+
+                current_metadata["active_token_jti"] = jti
+                
+                await prisma_client.db.litellm_usertable.update(
+                    where={"user_id": login_result.user_id},
+                    data={"metadata": current_metadata}
+                )
+    except Exception as e:
+        verbose_proxy_logger.error(f"Failed to update active_token_jti: {str(e)}")
+
+
     jwt_token = jwt.encode(
         cast(dict, returned_ui_token_object),
         cast(str, master_key),
@@ -8595,7 +8639,8 @@ async def login(request: Request):  # noqa: PLR0915
 
     # Create redirect response with cookie
     redirect_response = RedirectResponse(url=litellm_dashboard_ui, status_code=303)
-    redirect_response.set_cookie(key="token", value=jwt_token)
+    # Set cookie with expiry matching token
+    redirect_response.set_cookie(key="token", value=jwt_token, expires=int(expiry_time.timestamp()))
     return redirect_response
 
 
@@ -8627,6 +8672,40 @@ async def login_v2(request: Request):  # noqa: PLR0915
 
         import jwt
 
+        # Add JTI and Expiry
+        token_expiry_minutes = int(os.getenv("LITELLM_TOKEN_EXPIRY_MINUTES", "60"))
+        expiry_time = datetime.utcnow() + timedelta(minutes=token_expiry_minutes)
+        jti = str(uuid.uuid4())
+
+        returned_ui_token_object["exp"] = int(expiry_time.timestamp())
+        returned_ui_token_object["jti"] = jti
+
+        # Update DB with active JTI
+        try:
+             if prisma_client is not None and login_result.user_id:
+               user_in_db = await prisma_client.db.litellm_usertable.find_unique(
+                    where={"user_id": login_result.user_id}
+               )
+               
+               if user_in_db:
+                    current_metadata = user_in_db.metadata or {}
+                    if isinstance(current_metadata, str):
+                        try:
+                            current_metadata = json.loads(current_metadata)
+                        except:
+                            current_metadata = {}
+                    elif not isinstance(current_metadata, dict):
+                        current_metadata = {}
+
+                    current_metadata["active_token_jti"] = jti
+                    
+                    await prisma_client.db.litellm_usertable.update(
+                        where={"user_id": login_result.user_id},
+                        data={"metadata": current_metadata}
+                    )
+        except Exception as e:
+            verbose_proxy_logger.error(f"Failed to update active_token_jti: {str(e)}")
+
         jwt_token = jwt.encode(
             cast(dict, returned_ui_token_object),
             cast(str, master_key),
@@ -8644,7 +8723,7 @@ async def login_v2(request: Request):  # noqa: PLR0915
             content={"redirect_url": litellm_dashboard_ui},
             status_code=status.HTTP_200_OK,
         )
-        json_response.set_cookie(key="token", value=jwt_token)
+        json_response.set_cookie(key="token", value=jwt_token, expires=int(expiry_time.timestamp()))
         return json_response
     except Exception as e:
         verbose_proxy_logger.exception(
@@ -8669,6 +8748,98 @@ async def login_v2(request: Request):  # noqa: PLR0915
                 param="None",
                 code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+@router.post("/refresh_token", include_in_schema=False)
+async def refresh_token(request: Request):
+    """
+    Refreshes the current access token.
+    1. Validates the current token.
+    2. Checks if JTI matches database.
+    3. Issues a new token with new expiry and new JTI.
+    4. Updates database with new JTI.
+    """
+    global master_key, prisma_client
+    
+    import jwt
+    
+    try:
+        # Get token from cookie or header
+        token = request.cookies.get("token")
+        if not token:
+             auth_header = request.headers.get("Authorization")
+             if auth_header and auth_header.startswith("Bearer "):
+                 token = auth_header.split(" ")[1]
+        
+        if not token:
+            raise HTTPException(status_code=401, detail="No token provided")
+
+        # Decode token (without verifying exp to allow refresh near expiry, but usually we refresh before)
+        # However, for security, we should verify signature. Exp handling is tricky if already expired.
+        # User prompt says "Renewal renewal popup appearing 1 minute before token expiration".
+        # So token is still valid.
+        
+        try:
+             payload = jwt.decode(token, cast(str, master_key), algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+             raise HTTPException(status_code=401, detail="Token Expired")
+        except jwt.InvalidTokenError:
+             raise HTTPException(status_code=401, detail="Invalid Token")
+
+        user_id = payload.get("user_id")
+        jti = payload.get("jti")
+        
+        if not user_id:
+             # If user_id is missing, checks are impossible.
+             raise HTTPException(status_code=401, detail="Invalid Token Payload")
+
+        # Verify JTI against DB
+        if prisma_client is not None:
+             user_in_db = await prisma_client.db.litellm_usertable.find_unique(where={"user_id": user_id})
+             if not user_in_db:
+                  raise HTTPException(status_code=401, detail="User not found")
+             
+             current_metadata = user_in_db.metadata or {}
+             if isinstance(current_metadata, str):
+                 current_metadata = json.loads(current_metadata)
+             
+             active_jti = current_metadata.get("active_token_jti")
+             
+             # If active_jti is set, it MUST match. 
+             if jti and active_jti and jti != active_jti:
+                  raise HTTPException(status_code=401, detail="Token has been invalidated")
+
+        # Generate new JTI and Expiry
+        token_expiry_minutes = int(os.getenv("LITELLM_TOKEN_EXPIRY_MINUTES", "60"))
+        expiry_time = datetime.utcnow() + timedelta(minutes=token_expiry_minutes)
+        new_jti = str(uuid.uuid4())
+        
+        payload["exp"] = int(expiry_time.timestamp())
+        payload["jti"] = new_jti
+        
+        # Update DB
+        if prisma_client is not None and user_in_db:
+            current_metadata = user_in_db.metadata or {} 
+            if isinstance(current_metadata, str):
+                 current_metadata = json.loads(current_metadata)
+            elif not isinstance(current_metadata, dict):
+                 current_metadata = {}
+                 
+            current_metadata["active_token_jti"] = new_jti
+            await prisma_client.db.litellm_usertable.update(
+                 where={"user_id": user_id},
+                 data={"metadata": current_metadata}
+            )
+
+        new_token = jwt.encode(payload, cast(str, master_key), algorithm="HS256")
+        
+        json_response = JSONResponse(content={"status": "success", "token": new_token})
+        json_response.set_cookie(key="token", value=new_token, expires=int(expiry_time.timestamp()))
+        return json_response
+
+    except Exception as e:
+        verbose_proxy_logger.error(f"Error refreshing token: {str(e)}")
+        raise HTTPException(status_code=401, detail=str(e))
 
 
 @app.get("/onboarding/get_token", include_in_schema=False)

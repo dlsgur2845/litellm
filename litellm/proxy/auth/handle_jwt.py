@@ -14,6 +14,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from fastapi import HTTPException
+import json
 
 from litellm._logging import verbose_proxy_logger
 from litellm.caching.caching import DualCache
@@ -608,6 +609,27 @@ class JWTHandler:
                     audience=audience,
                     leeway=self.leeway,  # allow testing of expired tokens
                 )
+
+
+                # JTI Validation
+                if self.prisma_client and "jti" in payload and "user_id" in payload:
+                    user_id = payload["user_id"]
+                    jti = payload["jti"]
+                    try:
+                        user = await self.prisma_client.db.litellm_usertable.find_unique(where={"user_id": user_id})
+                        if user:
+                            current_metadata = user.metadata or {}
+                            if isinstance(current_metadata, str):
+                                current_metadata = json.loads(current_metadata)
+                            
+                            active_jti = current_metadata.get("active_token_jti")
+                            if active_jti and active_jti != jti:
+                                raise Exception("Token has been invalidated (concurrent login detected)")
+                    except Exception as e:
+                        if "Token has been invalidated" in str(e):
+                            raise e
+                        verbose_proxy_logger.error(f"JTI Validation error: {str(e)}")
+
                 return payload
 
             except jwt.ExpiredSignatureError:
@@ -635,6 +657,25 @@ class JWTHandler:
                     audience=audience,
                     options=decode_options,
                 )
+                # JTI Validation
+                if self.prisma_client and "jti" in payload and "user_id" in payload:
+                    user_id = payload["user_id"]
+                    jti = payload["jti"]
+                    try:
+                        user = await self.prisma_client.db.litellm_usertable.find_unique(where={"user_id": user_id})
+                        if user:
+                            current_metadata = user.metadata or {}
+                            if isinstance(current_metadata, str):
+                                current_metadata = json.loads(current_metadata)
+                            
+                            active_jti = current_metadata.get("active_token_jti")
+                            if active_jti and active_jti != jti:
+                                raise Exception("Token has been invalidated (concurrent login detected)")
+                    except Exception as e:
+                        if "Token has been invalidated" in str(e):
+                            raise e
+                        verbose_proxy_logger.error(f"JTI Validation error: {str(e)}")
+
                 return payload
 
             except jwt.ExpiredSignatureError:

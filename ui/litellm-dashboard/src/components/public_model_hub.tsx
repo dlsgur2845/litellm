@@ -941,6 +941,7 @@ const PublicModelHub: React.FC<PublicModelHubProps> = ({ accessToken, isEmbedded
             setProxySettings={setProxySettings}
             proxySettings={proxySettings}
             accessToken={accessToken || null}
+            token={null}
             isPublicPage={true}
           />
         )}

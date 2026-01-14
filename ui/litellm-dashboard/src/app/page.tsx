@@ -299,6 +299,7 @@ export default function CreateKeyPage() {
                 isPublicPage={false}
                 sidebarCollapsed={sidebarCollapsed}
                 onToggleSidebar={toggleSidebar}
+                token={token}
               />
               <div className="flex flex-1">
                 <div className="mt-2">

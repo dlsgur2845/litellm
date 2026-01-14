@@ -15,6 +15,7 @@ import {
 import { clearTokenCookies } from "@/utils/cookieUtils";
 import { fetchProxySettings } from "@/utils/proxyUtils";
 import { useTheme } from "@/contexts/ThemeContext";
+import TokenExpirationTimer from "./TokenExpirationTimer";
 
 interface NavbarProps {
   userID: string | null;
@@ -24,6 +25,7 @@ interface NavbarProps {
   proxySettings: any;
   setProxySettings: React.Dispatch<React.SetStateAction<any>>;
   accessToken: string | null;
+  token: string | null;
   isPublicPage: boolean;
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
@@ -37,6 +39,7 @@ const Navbar: React.FC<NavbarProps> = ({
   proxySettings,
   setProxySettings,
   accessToken,
+  token,
   isPublicPage = false,
   sidebarCollapsed = false,
   onToggleSidebar,
@@ -167,7 +170,7 @@ const Navbar: React.FC<NavbarProps> = ({
               <Link href="/" className="flex items-center">
                 <div className="relative">
                   <img src={imageUrl} alt="LiteLLM Brand" className="h-10 w-auto" />
-                  <span 
+                  <span
                     className="absolute -top-1 -right-2 text-lg animate-bounce"
                     style={{ animationDuration: '2s' }}
                     title="Happy Holidays!"
@@ -199,6 +202,8 @@ const Navbar: React.FC<NavbarProps> = ({
               Docs
             </a>
 
+            {!isPublicPage && token && <TokenExpirationTimer token={token} />}
+
             {!isPublicPage && (
               <Dropdown
                 menu={{
@@ -226,6 +231,7 @@ const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       </div>
+
     </nav>
   );
 };
