@@ -4,7 +4,7 @@ import { useLogin } from "@/app/(dashboard)/hooks/login/useLogin";
 import { useUIConfig } from "@/app/(dashboard)/hooks/uiConfig/useUIConfig";
 import LoadingScreen from "@/components/common_components/LoadingScreen";
 import { getProxyBaseUrl } from "@/components/networking";
-import { getCookie } from "@/utils/cookieUtils";
+import { getCookie, setAuthToken } from "@/utils/cookieUtils";
 import { isJwtExpired } from "@/utils/jwtUtils";
 import { InfoCircleOutlined } from "@ant-design/icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -44,6 +44,9 @@ function LoginPageContent() {
       { username, password },
       {
         onSuccess: (data) => {
+          if (data.token) {
+            setAuthToken(data.token);
+          }
           router.push(data.redirect_url);
         },
       },

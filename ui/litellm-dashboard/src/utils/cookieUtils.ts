@@ -10,6 +10,9 @@ export function clearTokenCookies() {
     return;
   }
 
+  // Clear from session storage
+  sessionStorage.removeItem("token");
+
   // Get the current domain
   const domain = window.location.hostname;
 
@@ -52,7 +55,16 @@ export function clearTokenCookies() {
  * @returns The cookie value or null if not found
  */
 export function getCookie(name: string) {
+  if (typeof window !== "undefined" && name === "token") {
+    return sessionStorage.getItem("token");
+  }
   if (typeof document === "undefined") return null;
   const cookieValue = document.cookie.split("; ").find((row) => row.startsWith(name + "="));
   return cookieValue ? cookieValue.split("=")[1] : null;
+}
+
+export function setAuthToken(token: string) {
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem("token", token);
+  }
 }

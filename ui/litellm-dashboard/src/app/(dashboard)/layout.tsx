@@ -26,7 +26,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { accessToken, token, userRole, userId, userEmail, premiumUser } = useAuthorized();
-  const { accessToken, token, userRole, userId, userEmail, premiumUser } = useAuthorized();
+
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [page, setPage] = useState(() => {
     return searchParams.get("page") || "api-keys";

@@ -17,7 +17,7 @@ import { useSearchParams } from "next/navigation";
 import { KeyResponse, Team } from "./key_team_helpers/key_list";
 import { jwtDecode } from "jwt-decode";
 import { Typography } from "antd";
-import { clearTokenCookies } from "@/utils/cookieUtils";
+import { clearTokenCookies, getCookie } from "@/utils/cookieUtils";
 
 export interface ProxySettings {
   PROXY_BASE_URL: string | null;
@@ -35,11 +35,7 @@ export type UserInfo = {
   spend: number;
 };
 
-function getCookie(name: string) {
-  console.log("COOKIES", document.cookie);
-  const cookieValue = document.cookie.split("; ").find((row) => row.startsWith(name + "="));
-  return cookieValue ? cookieValue.split("=")[1] : null;
-}
+
 
 interface UserDashboardProps {
   userID: string | null;
@@ -99,15 +95,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   };
   const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
   const [selectedKeyAlias, setSelectedKeyAlias] = useState<string | null>(null);
-  // check if window is not undefined
-  if (typeof window !== "undefined") {
-    window.addEventListener("beforeunload", function () {
-      // Clear session storage
-      sessionStorage.clear();
-      // Note: MCP auth tokens are persistent and should not be cleared on page refresh
-      // They are only cleared on logout
-    });
-  }
+
 
   function formatUserRole(userRole: string) {
     if (!userRole) {
@@ -291,7 +279,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
 
   if (token == null) {
     // user is not logged in as yet
-    console.log("All cookies before redirect:", document.cookie);
+
 
     // Clear token cookies using the utility function
     gotoLogin();
@@ -345,7 +333,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   }
 
   console.log("inside user dashboard, selected team", selectedTeam);
-  console.log("All cookies after redirect:", document.cookie);
+
   return (
     <div className="w-full mx-4 h-[75vh]">
       <Grid numItems={1} className="gap-2 p-8 w-full mt-2">

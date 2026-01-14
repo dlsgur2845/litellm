@@ -11,7 +11,7 @@ import {
 } from "@/components/networking";
 import { jwtDecode } from "jwt-decode";
 import { Form, Button as Button2 } from "antd";
-import { getCookie } from "@/utils/cookieUtils";
+import { getCookie, setAuthToken } from "@/utils/cookieUtils";
 
 export default function Onboarding() {
   const [form] = Form.useForm();
@@ -75,11 +75,11 @@ export default function Onboarding() {
     }
     claimOnboardingToken(accessToken, inviteID, userID, formValues.password).then((data) => {
       // set cookie "token" to jwtToken
-      document.cookie = "token=" + jwtToken;
-      
+      setAuthToken(jwtToken);
+
       const proxyBaseUrl = getProxyBaseUrl();
       console.log("proxyBaseUrl:", proxyBaseUrl);
-      
+
       // Construct the full redirect URL using the proxyBaseUrl which includes the server root path
       let redirectUrl = proxyBaseUrl ? `${proxyBaseUrl}/ui/?login=success` : "/ui/?login=success";
       console.log("redirecting to:", redirectUrl);

@@ -8640,7 +8640,14 @@ async def login(request: Request):  # noqa: PLR0915
     # Create redirect response with cookie
     redirect_response = RedirectResponse(url=litellm_dashboard_ui, status_code=303)
     # Set cookie with expiry matching token
-    redirect_response.set_cookie(key="token", value=jwt_token, expires=int(expiry_time.timestamp()))
+    redirect_response.set_cookie(
+        key="token",
+        value=jwt_token,
+        expires=int(expiry_time.timestamp()),
+        httponly=True,
+        secure=True,
+        samesite="Lax",
+    )
     return redirect_response
 
 
@@ -8720,7 +8727,7 @@ async def login_v2(request: Request):  # noqa: PLR0915
         litellm_dashboard_ui += "?login=success"
 
         json_response = JSONResponse(
-            content={"redirect_url": litellm_dashboard_ui},
+            content={"redirect_url": litellm_dashboard_ui, "token": jwt_token},
             status_code=status.HTTP_200_OK,
         )
         json_response.set_cookie(key="token", value=jwt_token, expires=int(expiry_time.timestamp()))
@@ -8913,11 +8920,12 @@ async def onboarding(invite_link: str, request: Request):
         request_type="key",
         **{
             "user_role": user_obj.user_role,
-            "duration": "24hr",
+            "duration": "24h",
             "key_max_budget": litellm.max_ui_session_budget,
             "models": [],
             "aliases": {},
             "config": {},
+            "metadata": {"is_onboarding_token": True},
             "spend": 0,
             "user_id": user_obj.user_id,
             "team_id": "litellm-dashboard",

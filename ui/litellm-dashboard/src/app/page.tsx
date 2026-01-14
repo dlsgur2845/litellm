@@ -17,6 +17,7 @@ import { Team } from "@/components/key_team_helpers/key_list";
 import { MCPServers } from "@/components/mcp_tools";
 import ModelHubTable from "@/components/model_hub_table";
 import Navbar from "@/components/navbar";
+import { getCookie, setAuthToken, clearTokenCookies } from "@/utils/cookieUtils";
 import { getUiConfig, Organization, proxyBaseUrl, setGlobalLitellmHeaderName } from "@/components/networking";
 import NewUsagePage from "@/components/UsagePage/components/UsagePageView";
 import OldTeams from "@/components/OldTeams";
@@ -43,22 +44,7 @@ import { jwtDecode } from "jwt-decode";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-function getCookie(name: string) {
-  // Safer cookie read + decoding; handles '=' inside values
-  const match = document.cookie.split("; ").find((row) => row.startsWith(name + "="));
-  if (!match) return null;
-  const value = match.slice(name.length + 1);
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
 
-function deleteCookie(name: string, path = "/") {
-  // Best-effort client-side clear (works for non-HttpOnly cookies without Domain)
-  document.cookie = `${name}=; Max-Age=0; Path=${path}`;
-}
 
 function formatUserRole(userRole: string) {
   if (!userRole) {
@@ -163,13 +149,22 @@ export default function CreateKeyPage() {
 
       if (cancelled) return;
 
+      // Check URL for token (SSO/Redirect flow)
+      const urlToken = searchParams.get("token");
+      if (urlToken) {
+        setAuthToken(urlToken);
+        // Remove from URL to be clean
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+
       const raw = getCookie("token");
       const valid = raw && !isJwtExpired(raw) ? raw : null;
 
       // If token exists but is invalid/expired, clear it so downstream code
       // doesn't keep trying to use it and cause redirect spasms.
       if (raw && !valid) {
-        deleteCookie("token", "/");
+        clearTokenCookies();
       }
 
       if (!cancelled) {
@@ -181,7 +176,7 @@ export default function CreateKeyPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     if (redirectToLogin) {
@@ -198,7 +193,7 @@ export default function CreateKeyPage() {
 
     // Defensive: re-check expiry in case cookie changed after mount
     if (isJwtExpired(token)) {
-      deleteCookie("token", "/");
+      clearTokenCookies();
       setToken(null);
       return;
     }
@@ -208,7 +203,7 @@ export default function CreateKeyPage() {
       decoded = jwtDecode(token);
     } catch {
       // Malformed token → treat as unauthenticated
-      deleteCookie("token", "/");
+      clearTokenCookies();
       setToken(null);
       return;
     }

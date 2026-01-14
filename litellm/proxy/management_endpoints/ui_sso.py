@@ -1977,10 +1977,12 @@ class SSOAuthenticationHandler:
             algorithm="HS256",
         )
         if user_id is not None and isinstance(user_id, str):
-            litellm_dashboard_ui += "?login=success"
+            litellm_dashboard_ui += f"?login=success&token={jwt_token}"
         verbose_proxy_logger.info(f"Redirecting to {litellm_dashboard_ui}")
         redirect_response = RedirectResponse(url=litellm_dashboard_ui, status_code=303)
-        redirect_response.set_cookie(key="token", value=jwt_token)
+        redirect_response.set_cookie(
+            key="token", value=jwt_token, httponly=True, secure=True, samesite="Lax"
+        )
         return redirect_response
 
     @staticmethod

@@ -5,7 +5,7 @@ import { Modal, Button, message } from "antd";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import { getProxyBaseUrl } from "@/components/networking";
-import { clearTokenCookies } from "@/utils/cookieUtils";
+import { clearTokenCookies, setAuthToken } from "@/utils/cookieUtils";
 
 interface TokenExpirationTimerProps {
     token: string | null;
@@ -77,6 +77,10 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
             });
 
             if (response.ok) {
+                const data = await response.json();
+                if (data.token) {
+                    setAuthToken(data.token);
+                }
                 message.success("Session renewed successfully");
                 setShowRenewalModal(false);
                 // Reload page to pick up new cookie in useAuthorized hooks

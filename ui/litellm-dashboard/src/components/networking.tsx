@@ -53,7 +53,7 @@ const defaultServerRootPath = "/";
 export let serverRootPath = defaultServerRootPath;
 export let proxyBaseUrl = defaultProxyBaseUrl;
 if (isLocal != true) {
-  console.log = function () {};
+  console.log = function () { };
 }
 
 const getWindowLocation = () => {
@@ -8101,6 +8101,7 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   redirect_url: string;
+  token?: string;
 }
 
 export const loginCall = async (username: string, password: string): Promise<LoginResponse> => {

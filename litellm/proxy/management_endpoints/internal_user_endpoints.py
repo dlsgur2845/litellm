@@ -12,11 +12,12 @@ These are members of a Team on LiteLLM
 """
 
 import asyncio
-import json
 import traceback
-from litellm._uuid import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Union, cast
+import os
+import json
+from typing import cast
+
+from litellm.proxy.management_endpoints.key_management_endpoints import delete_key_fn
 
 import fastapi
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -795,6 +796,65 @@ def _process_keys_for_user_info(
     return returned_keys
 
 
+
+def _validate_password_complexity(password: str, user_id: Optional[str], user_email: Optional[str]):
+    # 1. Length 8+
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters long")
+
+    # 2. Character types (1+ letter, 1+ number, 1+ special)
+    if not re.search(r'[A-Za-z]', password):
+        raise ValueError("Password must contain at least one letter")
+    if not re.search(r'[0-9]', password):
+        raise ValueError("Password must contain at least one number")
+    if not re.search(r'[^A-Za-z0-9]', password):
+        raise ValueError("Password must contain at least one special character")
+
+    # 3. Sequential chars (max 3 consecutive) - e.g. 1234, abcd (checks for 4 or more)
+    for i in range(len(password) - 3):
+        chunk = password[i:i+4]
+        # Check numeric sequence
+        if chunk.isdigit():
+            # check forward
+            if "0123456789".find(chunk) != -1:
+                raise ValueError("Password cannot contain continuous sequence of 4 or more numbers (e.g. 1234)")
+            # check backward
+            if "9876543210".find(chunk) != -1:
+                raise ValueError("Password cannot contain continuous sequence of 4 or more numbers (e.g. 4321)")
+        
+        # Check alpha sequence
+        chunk_lower = chunk.lower()
+        if chunk_lower.isalpha():
+             alphabet = "abcdefghijklmnopqrstuvwxyz"
+             if alphabet.find(chunk_lower) != -1:
+                 raise ValueError("Password cannot contain continuous sequence of 4 or more letters (e.g. abcd)")
+             alphabet_rev = "zyxwvutsrqponmlkjihgfedcba"
+             if alphabet_rev.find(chunk_lower) != -1:
+                 raise ValueError("Password cannot contain continuous sequence of 4 or more letters (e.g. dcba)")
+
+    # 4. Repeated chars (max 3 consecutive) - e.g. aaaa, 1111 (checks for 4 or more)
+    if re.search(r'(.)\1\1\1', password):
+        raise ValueError("Password cannot contain 4 or more consecutive identical characters (e.g. aaaa, 1111)")
+
+    # 5. Account name inclusion
+    if user_id and user_id in password:
+         raise ValueError("Password cannot contain the user ID")
+    if user_email:
+         if user_email in password:
+             raise ValueError("Password cannot contain the email")
+         # Check part before @
+         username_part = user_email.split("@")[0]
+         if len(username_part) >= 4 and username_part in password:
+             raise ValueError("Password cannot contain the email username")
+
+    # 6. Guessable strings
+    blacklist_env = os.getenv("LITELLM_PASSWORD_BLACKLIST", "admin,password")
+    blacklist = [x.strip() for x in blacklist_env.split(",")]
+    for bad_word in blacklist:
+        if bad_word and bad_word in password:
+             raise ValueError(f"Password cannot contain commonly used word: {bad_word}")
+
+
 def _update_internal_user_params(
     data_json: dict, data: Union[UpdateUserRequest, UpdateUserRequestNoUserIDorEmail]
 ) -> dict:
@@ -909,6 +969,11 @@ async def _update_single_user_helper(
         non_default_values=non_default_values,
         existing_metadata=existing_metadata or {},
     )
+
+    if "password" in non_default_values:
+        eff_user_id = user_request.user_id or (existing_user_row.user_id if existing_user_row else None)
+        eff_user_email = user_request.user_email or (existing_user_row.user_email if existing_user_row else None)
+        _validate_password_complexity(non_default_values["password"], eff_user_id, eff_user_email)
 
     # Perform the update
     response: Optional[Dict[str, Any]] = None
@@ -1069,6 +1134,23 @@ async def user_update(
             user_request=data,
             user_api_key_dict=user_api_key_dict,
         )
+
+        # Check if the token used for this request was an onboarding token
+        if (
+            user_api_key_dict.metadata
+            and user_api_key_dict.metadata.get("is_onboarding_token", False) is True
+            and user_api_key_dict.token
+        ):
+            from litellm.proxy.management_endpoints.key_management_endpoints import (
+                KeyRequest,
+            )
+
+            # Invalidate the onboarding token
+            await delete_key_fn(
+                data=KeyRequest(keys=[user_api_key_dict.token]),
+                user_api_key_dict=user_api_key_dict,
+            )
+
         return response
     except Exception as e:
         verbose_proxy_logger.exception(

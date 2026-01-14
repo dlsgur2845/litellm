@@ -1884,6 +1884,7 @@ async def info_key_fn_v2(
             except Exception:
                 # if using pydantic v1
                 k = k.dict()
+            k.pop("password", None)
             filtered_key_info.append(k)
         return {"key": data.keys, "info": filtered_key_info}
 
