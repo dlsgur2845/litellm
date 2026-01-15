@@ -848,7 +848,7 @@ def _validate_password_complexity(password: str, user_id: Optional[str], user_em
              raise ValueError("Password cannot contain the email username")
 
     # 6. Guessable strings
-    blacklist_env = os.getenv("LITELLM_PASSWORD_BLACKLIST", "admin,password")
+    blacklist_env = os.getenv("PASSWORD_BLACKLIST", "admin,password")
     blacklist = [x.strip() for x in blacklist_env.split(",")]
     for bad_word in blacklist:
         if bad_word and bad_word in password:
