@@ -60,8 +60,8 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
         return () => clearInterval(interval);
     }, [token, showRenewalModal]);
 
-    const handleLogout = () => {
-        clearTokenCookies();
+    const handleLogout = async () => {
+        await clearTokenCookies();
         router.push(`${getProxyBaseUrl()}/ui/login`);
     };
 

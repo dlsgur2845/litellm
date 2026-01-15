@@ -4515,7 +4515,8 @@ def embedding(  # noqa: PLR0915
                 optional_params["encoding_format"] = encoding_format
             else:
                 # Omiting causes openai sdk to add default value of "float"
-                optional_params["encoding_format"] = None
+                # If the user has a default encoding format in their env, use that
+                optional_params["encoding_format"] = os.getenv("EMBEDDING_ENCODING_FORMAT", None) 
 
             api_version = None
 

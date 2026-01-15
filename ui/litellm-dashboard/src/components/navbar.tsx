@@ -139,7 +139,9 @@ const Navbar: React.FC<NavbarProps> = ({
     {
       key: "logout",
       label: (
-        <div className="flex items-center py-2 px-3 hover:bg-gray-50 rounded-md mx-1 my-1" onClick={handleLogout}>
+        <div className="flex items-center py-2 px-3 hover:bg-gray-50 rounded-md mx-1 my-1" onClick={async () => {
+          await handleLogout();
+        }}>
           <LogoutOutlined className="mr-3 text-gray-600" />
           <span className="text-gray-800">Logout</span>
         </div>

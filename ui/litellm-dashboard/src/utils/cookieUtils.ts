@@ -5,12 +5,20 @@
 /**
  * Clears the token cookie from both root and /ui paths
  */
-export function clearTokenCookies() {
+import { getProxyBaseUrl } from "@/components/networking";
+
+/**
+ * Clears the token cookie from both root and /ui paths
+ */
+export async function clearTokenCookies() {
   if (typeof window === "undefined" || typeof document === "undefined") {
     return;
   }
 
-  // Clear from session storage
+  // Get token before clearing
+  const token = sessionStorage.getItem("token");
+
+  // Clear from session storage immediately
   sessionStorage.removeItem("token");
 
   // Get the current domain
@@ -45,6 +53,26 @@ export function clearTokenCookies() {
       document.cookie = `token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain}; SameSite=${sameSite};${secureFlag}`;
     });
   });
+
+  // Call backend logout in background
+  if (token) {
+    try {
+      // We don't await this to avoid blocking the caller if they don't await, 
+      // but since this function is async, they can if they want.
+      // keepalive: true ensures it completes even if page unloads.
+      fetch(`${getProxyBaseUrl()}/v2/logout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        keepalive: true,
+      }).catch(e => console.error("Failed to logout from server", e));
+    } catch (e) {
+      console.error("Failed to initiate logout", e);
+    }
+  }
+
 
   console.log("After clearing cookies:", document.cookie);
 }

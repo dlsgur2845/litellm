@@ -1364,6 +1364,25 @@ class JWTAuthManager:
             )
         )
 
+        # Enforce Single Active Token Policy
+        if user_object and user_object.metadata:
+            metadata = user_object.metadata
+            if isinstance(metadata, str):
+                import json
+                try:
+                    metadata = json.loads(metadata)
+                except:
+                    metadata = {}
+            
+            active_jti = metadata.get("active_token_jti")
+            token_jti = jwt_valid_token.get("jti")
+            
+            if active_jti and token_jti and active_jti != token_jti:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Token has been invalidated (Multiple active sessions detected)",
+                )
+
         await JWTAuthManager.sync_user_role_and_teams(
             jwt_handler=jwt_handler,
             jwt_valid_token=jwt_valid_token,

@@ -8640,14 +8640,7 @@ async def login(request: Request):  # noqa: PLR0915
     # Create redirect response with cookie
     redirect_response = RedirectResponse(url=litellm_dashboard_ui, status_code=303)
     # Set cookie with expiry matching token
-    redirect_response.set_cookie(
-        key="token",
-        value=jwt_token,
-        expires=int(expiry_time.timestamp()),
-        httponly=True,
-        secure=True,
-        samesite="Lax",
-    )
+
     return redirect_response
 
 
@@ -8730,7 +8723,7 @@ async def login_v2(request: Request):  # noqa: PLR0915
             content={"redirect_url": litellm_dashboard_ui, "token": jwt_token},
             status_code=status.HTTP_200_OK,
         )
-        json_response.set_cookie(key="token", value=jwt_token, expires=int(expiry_time.timestamp()))
+
         return json_response
     except Exception as e:
         verbose_proxy_logger.exception(
@@ -8756,6 +8749,67 @@ async def login_v2(request: Request):  # noqa: PLR0915
                 code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+
+
+@router.post("/v2/logout", include_in_schema=False)
+async def logout(request: Request):
+    """
+    Logs out the user.
+    1. Validates the current token.
+    2. Updates database to invalidate the current JTI (set active_token_jti to null).
+    """
+    global master_key, prisma_client
+    
+    import jwt
+    
+    try:
+        # Get token from cookie or header
+        token = request.cookies.get("token")
+        if not token:
+             auth_header = request.headers.get("Authorization")
+             if auth_header and auth_header.startswith("Bearer "):
+                 token = auth_header.split(" ")[1]
+        
+        if not token:
+            # Already logged out or no token, just return success
+            return JSONResponse(content={"status": "success", "message": "Logged out"})
+
+        try:
+             # Decode without verification to get user_id even if expired
+             # We want to ensure we clear the DB record regardless
+             payload = jwt.decode(token, cast(str, master_key), algorithms=["HS256"], options={"verify_exp": False})
+        except Exception:
+             # Invalid token format, just return success
+             return JSONResponse(content={"status": "success", "message": "Logged out"})
+
+        user_id = payload.get("user_id")
+        
+        if user_id and prisma_client is not None:
+             user_in_db = await prisma_client.db.litellm_usertable.find_unique(where={"user_id": user_id})
+             if user_in_db:
+                  current_metadata = user_in_db.metadata or {}
+                  if isinstance(current_metadata, str):
+                      try:
+                          current_metadata = json.loads(current_metadata)
+                      except:
+                          current_metadata = {}
+                  elif not isinstance(current_metadata, dict):
+                        current_metadata = {}
+                  
+                  # Invalidate the JTI
+                  current_metadata["active_token_jti"] = None
+                  
+                  await prisma_client.db.litellm_usertable.update(
+                       where={"user_id": user_id},
+                       data={"metadata": current_metadata}
+                  )
+
+        return JSONResponse(content={"status": "success", "message": "Logged out"})
+
+    except Exception as e:
+        verbose_proxy_logger.error(f"Error logging out: {str(e)}")
+        # Don't block logout on error
+        return JSONResponse(content={"status": "success", "message": "Logged out"})
 
 @router.post("/refresh_token", include_in_schema=False)
 async def refresh_token(request: Request):
@@ -8841,7 +8895,7 @@ async def refresh_token(request: Request):
         new_token = jwt.encode(payload, cast(str, master_key), algorithm="HS256")
         
         json_response = JSONResponse(content={"status": "success", "token": new_token})
-        json_response.set_cookie(key="token", value=new_token, expires=int(expiry_time.timestamp()))
+
         return json_response
 
     except Exception as e:
