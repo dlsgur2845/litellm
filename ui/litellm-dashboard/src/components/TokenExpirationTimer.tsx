@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Modal, Button, message } from "antd";
+import { ReloadOutlined } from "@ant-design/icons";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import { getProxyBaseUrl } from "@/components/networking";
@@ -17,6 +18,12 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
     const [showRenewalModal, setShowRenewalModal] = useState(false);
     const [isRenewing, setIsRenewing] = useState(false);
 
+    // Manual renewal cooldown state
+    const [renewCooldown, setRenewCooldown] = useState(false);
+
+    // Determines when to show the popup (default 60s, but 10s if short lived)
+    const [warningThreshold, setWarningThreshold] = useState(60000);
+
     useEffect(() => {
         if (!token) return;
 
@@ -26,6 +33,18 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
             console.log("TokenExpirationTimer: Decoded token", decoded);
             if (decoded.exp) {
                 expirationTime = decoded.exp * 1000; // Convert to ms
+
+                // Adaptive Threshold Logic
+                if (decoded.iat) {
+                    const iatTime = decoded.iat * 1000;
+                    const totalDuration = expirationTime - iatTime;
+                    // If total duration is small (<= 90 seconds to be safe), warn only 10s before
+                    if (totalDuration <= 90000) {
+                        setWarningThreshold(10000);
+                    } else {
+                        setWarningThreshold(60000);
+                    }
+                }
             } else {
                 console.warn("TokenExpirationTimer: No exp claim in token");
             }
@@ -46,19 +65,15 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
             } else {
                 setTimeRemaining(diff);
 
-                // Show modal if less than 60 seconds (60000 ms) and not already showing
-                if (diff < 60000 && !showRenewalModal) {
-                    // Only show if we haven't Just closed it?
-                    // Simple logic: if < 60s, show it.
-                    // But if user closes it, we shouldn't show it again immediately?
-                    // For now, force user to act.
+                // Show modal based on adaptive threshold
+                if (diff < warningThreshold && !showRenewalModal) {
                     setShowRenewalModal(true);
                 }
             }
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [token, showRenewalModal]);
+    }, [token, showRenewalModal, warningThreshold]);
 
     const handleLogout = async () => {
         await clearTokenCookies();
@@ -72,7 +87,7 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}` // Send old token just in case, though cookie is primary
+                    "Authorization": `Bearer ${token}`
                 },
             });
 
@@ -83,12 +98,18 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
                 }
                 message.success("Session renewed successfully");
                 setShowRenewalModal(false);
-                // Reload page to pick up new cookie in useAuthorized hooks
+
+                // Activate Cooldown for Manual Button
+                setRenewCooldown(true);
+                setTimeout(() => {
+                    setRenewCooldown(false);
+                }, 10000); // 10 seconds cooldown
+
+                // Reload page to pick up new cookie
                 window.location.reload();
             } else {
                 const errorData = await response.json().catch(() => ({}));
                 message.error(`Failed to renew session: ${errorData.detail || "Unknown error"}`);
-                // If renewal fails (e.g. invalid JTI), we should probably logout
                 handleLogout();
             }
         } catch (error) {
@@ -110,17 +131,28 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
 
     return (
         <>
-            <div className="flex items-center text-gray-500 mr-4 font-mono text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50">
-                Expires in: {formatTime(timeRemaining)}
+            <div className="flex items-center gap-2 mr-4">
+                <div className="flex items-center text-gray-500 font-mono text-sm border border-gray-200 rounded px-2 py-1 bg-gray-50">
+                    Expires in: {formatTime(timeRemaining)}
+                </div>
+
+                {/* Manual Renewal Icon Button (Right side) */}
+                {!showRenewalModal && (
+                    <Button
+                        type="text"
+                        size="small"
+                        onClick={handleRenew}
+                        disabled={renewCooldown || isRenewing}
+                        title={renewCooldown ? "Please wait 10s before renewing again" : "Renew session"}
+                        icon={<ReloadOutlined spin={isRenewing} />}
+                    />
+                )}
             </div>
 
             <Modal
                 title="Session Expiring"
                 open={showRenewalModal}
-                onCancel={handleLogout} // Closing modal logs out to enforce security? Or just dismisses? Prompt says "Renewal popup". Usually blocking.
-                // Let's make it closable but it will disappear only if valid?
-                // Actually if I close it, the timer continues and will eventually logout.
-                // Let's allow close.
+                onCancel={handleLogout}
                 footer={[
                     <Button key="logout" onClick={handleLogout}>
                         Logout

@@ -8697,12 +8697,19 @@ async def login_v2(request: Request):  # noqa: PLR0915
                     elif not isinstance(current_metadata, dict):
                         current_metadata = {}
 
-                    current_metadata["active_token_jti"] = jti
-                    
-                    await prisma_client.db.litellm_usertable.update(
-                        where={"user_id": login_result.user_id},
-                        data={"metadata": current_metadata}
-                    )
+                    if current_metadata.get("active_token_jti") != jti:
+                      current_metadata["active_token_jti"] = jti
+                      
+                      try:
+                          from prisma import Json
+                      except ImportError:
+                          pass
+                      metadata_update = Json(current_metadata) if 'Json' in locals() else current_metadata
+
+                      await prisma_client.db.litellm_usertable.update(
+                          where={"user_id": login_result.user_id},
+                          data={"metadata": metadata_update}
+                      )
         except Exception as e:
             verbose_proxy_logger.error(f"Failed to update active_token_jti: {str(e)}")
 
@@ -8799,9 +8806,15 @@ async def logout(request: Request):
                   # Invalidate the JTI
                   current_metadata["active_token_jti"] = None
                   
+                  try:
+                      from prisma import Json
+                  except ImportError:
+                      pass
+                  metadata_update = Json(current_metadata) if 'Json' in locals() else current_metadata
+
                   await prisma_client.db.litellm_usertable.update(
                        where={"user_id": user_id},
-                       data={"metadata": current_metadata}
+                       data={"metadata": metadata_update}
                   )
 
         return JSONResponse(content={"status": "success", "message": "Logged out"})
@@ -8880,6 +8893,13 @@ async def refresh_token(request: Request):
         
         # Update DB
         if prisma_client is not None and user_in_db:
+            try:
+                from prisma import Json
+            except ImportError:
+                # If prisma is not installed/configured properly, we might fail here,
+                # but if prisma_client exists, prisma should be importable.
+                pass
+
             current_metadata = user_in_db.metadata or {} 
             if isinstance(current_metadata, str):
                  current_metadata = json.loads(current_metadata)
@@ -8887,9 +8907,13 @@ async def refresh_token(request: Request):
                  current_metadata = {}
                  
             current_metadata["active_token_jti"] = new_jti
+            
+            # Wrap in Json() if available, otherwise pass dict and hope
+            metadata_update = Json(current_metadata) if 'Json' in locals() else current_metadata
+
             await prisma_client.db.litellm_usertable.update(
                  where={"user_id": user_id},
-                 data={"metadata": current_metadata}
+                 data={"metadata": metadata_update}
             )
 
         new_token = jwt.encode(payload, cast(str, master_key), algorithm="HS256")
@@ -8943,6 +8967,11 @@ async def onboarding(invite_link: str, request: Request):
     if expires_at_date < utc_now_date:
         raise HTTPException(
             status_code=401, detail={"error": "Invitation link has expired."}
+        )
+
+    if invite_obj.is_accepted:
+        raise HTTPException(
+            status_code=401, detail={"error": "Invitation link has already been claimed."}
         )
 
     #### INVALIDATE LINK
