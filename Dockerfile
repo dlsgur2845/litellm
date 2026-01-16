@@ -146,7 +146,8 @@ RUN pip install --no-index --find-links=/wheels/ -r requirements.txt && \
 # Permissions, cleanup, and Prisma prep
 RUN chmod +x docker/entrypoint.sh docker/prod_entrypoint.sh && \
     mkdir -p /nonexistent /.npm /tmp/litellm_assets /tmp/litellm_ui && \
-    chown -R nobody:nogroup /app /tmp/litellm_ui /tmp/litellm_assets /nonexistent /.npm && \
+    addgroup -g 1000 appgrp && adduser -u 1000 -G appgrp -D appusr && \
+    chown -R appusr:appgrp /app /tmp/litellm_ui /tmp/litellm_assets /nonexistent /.npm && \
     pip uninstall jwt -y || true && \
     pip uninstall PyJWT -y || true && \
     pip install --no-index --find-links=/wheels/ PyJWT==2.10.1 --no-cache-dir && \
@@ -154,9 +155,9 @@ RUN chmod +x docker/entrypoint.sh docker/prod_entrypoint.sh && \
     mkdir -p /tmp/.npm /nonexistent /.npm && \
     prisma generate && \
     PRISMA_PATH=$(python -c "import os, prisma; print(os.path.dirname(prisma.__file__))") && \
-    chown -R nobody:nogroup $PRISMA_PATH && \
+    chown -R appusr:appgrp $PRISMA_PATH && \
     LITELLM_PKG_MIGRATIONS_PATH="$(python -c 'import os, litellm_proxy_extras; print(os.path.dirname(litellm_proxy_extras.__file__))' 2>/dev/null || echo '')/migrations" && \
-    [ -n "$LITELLM_PKG_MIGRATIONS_PATH" ] && chown -R nobody:nogroup $LITELLM_PKG_MIGRATIONS_PATH && \
+    [ -n "$LITELLM_PKG_MIGRATIONS_PATH" ] && chown -R appusr:appgrp $LITELLM_PKG_MIGRATIONS_PATH && \
     LITELLM_PROXY_EXTRAS_PATH=$(python -c "import os, litellm_proxy_extras; print(os.path.dirname(litellm_proxy_extras.__file__))" 2>/dev/null || echo "") && \
     chgrp -R 0 $PRISMA_PATH /tmp/litellm_ui /tmp/litellm_assets && \
     [ -n "$LITELLM_PROXY_EXTRAS_PATH" ] && chgrp -R 0 $LITELLM_PROXY_EXTRAS_PATH || true && \
@@ -168,7 +169,7 @@ RUN chmod +x docker/entrypoint.sh docker/prod_entrypoint.sh && \
     chmod -R g+rX /app/.cache
 
 # Switch to non-root user for runtime
-USER nobody
+USER appusr
 
 # Prisma runtime knobs for offline containers
 ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1 \
