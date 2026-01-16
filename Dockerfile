@@ -75,7 +75,7 @@ RUN if [ "$PROXY_EXTRAS_SOURCE" = "local" ]; then \
 
 # Pre-cache Prisma binaries in the builder stage
 ENV PRISMA_BINARY_CACHE_DIR=/app/.cache/prisma-python/binaries \
-    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x" \
+    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x,linux-arm64-openssl-3.0.x" \
     XDG_CACHE_HOME=/app/.cache \
     PATH="/usr/lib/python3.13/site-packages/nodejs/bin:${PATH}"
 
@@ -125,7 +125,7 @@ COPY --from=builder /usr/bin/prisma /usr/bin/prisma
 
 # Final runtime environment configuration
 ENV PRISMA_BINARY_CACHE_DIR=/app/.cache/prisma-python/binaries \
-    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x" \
+    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x,linux-arm64-openssl-3.0.x" \
     HOME=/app \
     LITELLM_NON_ROOT=true \
     XDG_CACHE_HOME=/app/.cache
@@ -151,6 +151,8 @@ RUN chmod +x docker/entrypoint.sh docker/prod_entrypoint.sh && \
     pip uninstall PyJWT -y || true && \
     pip install --no-index --find-links=/wheels/ PyJWT==2.10.1 --no-cache-dir && \
     rm -rf /wheels && \
+    mkdir -p /tmp/.npm /nonexistent /.npm && \
+    prisma generate && \
     PRISMA_PATH=$(python -c "import os, prisma; print(os.path.dirname(prisma.__file__))") && \
     chown -R nobody:nogroup $PRISMA_PATH && \
     LITELLM_PKG_MIGRATIONS_PATH="$(python -c 'import os, litellm_proxy_extras; print(os.path.dirname(litellm_proxy_extras.__file__))' 2>/dev/null || echo '')/migrations" && \
@@ -163,9 +165,7 @@ RUN chmod +x docker/entrypoint.sh docker/prod_entrypoint.sh && \
     chmod -R g+w $PRISMA_PATH /tmp/litellm_ui /tmp/litellm_assets && \
     [ -n "$LITELLM_PROXY_EXTRAS_PATH" ] && chmod -R g+w $LITELLM_PROXY_EXTRAS_PATH || true && \
     chmod -R g+rX $PRISMA_PATH && \
-    chmod -R g+rX /app/.cache && \
-    mkdir -p /tmp/.npm /nonexistent /.npm && \
-    prisma generate
+    chmod -R g+rX /app/.cache
 
 # Switch to non-root user for runtime
 USER nobody

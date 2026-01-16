@@ -2055,6 +2055,7 @@ async def generate_key_helper_fn(  # noqa: PLR0915
     object_permission: Optional[LiteLLM_ObjectPermissionBase] = None,
     auto_rotate: Optional[bool] = None,
     rotation_interval: Optional[str] = None,
+    password: Optional[str] = None,
 ):
     from litellm.proxy.proxy_server import premium_user, prisma_client
 
@@ -2133,6 +2134,8 @@ async def generate_key_helper_fn(  # noqa: PLR0915
             "sso_user_id": sso_user_id,
             "object_permission_id": object_permission_id,
         }
+        if password is not None:
+            user_data["password"] = hash_token(password)
         if teams is not None:
             user_data["teams"] = teams
         key_data = {

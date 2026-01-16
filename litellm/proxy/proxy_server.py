@@ -8804,7 +8804,7 @@ async def logout(request: Request):
                         current_metadata = {}
                   
                   # Invalidate the JTI
-                  current_metadata["active_token_jti"] = None
+                  current_metadata["active_token_jti"] = "logged_out"
                   
                   try:
                       from prisma import Json
@@ -9068,6 +9068,18 @@ async def claim_onboarding_link(data: InvitationClaim):
     This route can only update user password.
     """
     global prisma_client
+    
+    # Check Password Complexity
+    from litellm.proxy.management_endpoints.internal_user_endpoints import (
+        _validate_password_complexity,
+    )
+    
+    if data.password:
+        try:
+             _validate_password_complexity(data.password, data.user_id, None)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     ### VALIDATE INVITE LINK ###
     if prisma_client is None:
         raise HTTPException(

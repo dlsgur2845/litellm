@@ -46,6 +46,7 @@ import { UserInfo } from "./view_users/types";
 import { EmailEventSettingsResponse, EmailEventSettingsUpdateRequest } from "./email_events/types";
 import { jsonFields } from "./common_components/check_openapi_schema";
 import NotificationsManager from "./molecules/notifications_manager";
+export { NotificationsManager };
 
 const isLocal = process.env.NODE_ENV === "development";
 export const defaultProxyBaseUrl = isLocal ? "http://localhost:4000" : null;
@@ -8085,13 +8086,17 @@ export const perUserAnalyticsCall = async (
 };
 
 const deriveErrorMessage = (errorData: any): string => {
-  return (
+  const msg =
     (errorData?.error && (errorData.error.message || errorData.error)) ||
     errorData?.message ||
     errorData?.detail ||
     errorData?.error ||
-    JSON.stringify(errorData)
-  );
+    JSON.stringify(errorData);
+
+  if (typeof msg === 'object') {
+    return JSON.stringify(msg);
+  }
+  return String(msg);
 };
 
 export interface LoginRequest {

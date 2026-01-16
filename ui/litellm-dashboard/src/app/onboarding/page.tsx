@@ -8,6 +8,7 @@ import {
   claimOnboardingToken,
   getUiConfig,
   getProxyBaseUrl,
+  NotificationsManager,
 } from "@/components/networking";
 import { jwtDecode } from "jwt-decode";
 import { Form, Button as Button2 } from "antd";
@@ -27,6 +28,12 @@ export default function Onboarding() {
   const [jwtToken, setJwtToken] = useState<string>("");
   const [getUiConfigLoading, setGetUiConfigLoading] = useState<boolean>(true);
 
+  // Error State for Invalid Link
+  const [errorState, setErrorState] = useState<{ isError: boolean; message: string }>({
+    isError: false,
+    message: "",
+  });
+
   useEffect(() => {
     getUiConfig().then((data) => {
       // get the information for constructing the proxy base url, and then set the token and auth loading
@@ -41,25 +48,33 @@ export default function Onboarding() {
       return;
     }
 
-    getOnboardingCredentials(inviteID).then((data) => {
-      const login_url = data.login_url;
-      console.log("login_url:", login_url);
-      setLoginUrl(login_url);
+    getOnboardingCredentials(inviteID)
+      .then((data) => {
+        const login_url = data.login_url;
+        console.log("login_url:", login_url);
+        setLoginUrl(login_url);
 
-      const token = data.token;
-      const decoded = jwtDecode(token) as { [key: string]: any };
-      setJwtToken(token);
+        const token = data.token;
+        const decoded = jwtDecode(token) as { [key: string]: any };
+        setJwtToken(token);
 
-      console.log("decoded:", decoded);
-      setAccessToken(decoded.key);
+        console.log("decoded:", decoded);
+        setAccessToken(decoded.key);
 
-      console.log("decoded user email:", decoded.user_email);
-      const user_email = decoded.user_email;
-      setUserEmail(user_email);
+        console.log("decoded user email:", decoded.user_email);
+        const user_email = decoded.user_email;
+        setUserEmail(user_email);
 
-      const user_id = decoded.user_id;
-      setUserID(user_id);
-    });
+        const user_id = decoded.user_id;
+        setUserID(user_id);
+      })
+      .catch((error) => {
+        console.error("Failed to get onboarding credentials:", error);
+        setErrorState({
+          isError: true,
+          message: error.message || "Invalid or Expired Invitation Link",
+        });
+      });
   }, [inviteID, getUiConfigLoading]);
 
   const handleSubmit = (formValues: Record<string, any>) => {
@@ -73,22 +88,45 @@ export default function Onboarding() {
     if (!userID || !inviteID) {
       return;
     }
-    claimOnboardingToken(accessToken, inviteID, userID, formValues.password).then((data) => {
-      // set cookie "token" to jwtToken
-      setAuthToken(jwtToken);
+    claimOnboardingToken(accessToken, inviteID, userID, formValues.password)
+      .then((data) => {
+        const proxyBaseUrl = getProxyBaseUrl();
+        console.log("proxyBaseUrl:", proxyBaseUrl);
 
-      const proxyBaseUrl = getProxyBaseUrl();
-      console.log("proxyBaseUrl:", proxyBaseUrl);
+        // Construct the full redirect URL using the proxyBaseUrl which includes the server root path
+        // Redirect to login page so user can login with their new password
+        let redirectUrl = proxyBaseUrl ? `${proxyBaseUrl}/ui` : "/ui";
+        console.log("redirecting to:", redirectUrl);
 
-      // Construct the full redirect URL using the proxyBaseUrl which includes the server root path
-      let redirectUrl = proxyBaseUrl ? `${proxyBaseUrl}/ui/?login=success` : "/ui/?login=success";
-      console.log("redirecting to:", redirectUrl);
-
-      window.location.href = redirectUrl;
-    });
+        window.location.href = redirectUrl;
+      })
+      .catch((error) => {
+        console.error("Claim token failed:", error);
+        NotificationsManager.fromBackend(error);
+      });
 
     // redirect to login page
   };
+
+  if (errorState.isError) {
+    return (
+      <div className="mx-auto w-full max-w-md mt-10">
+        <Card>
+          <div className="flex flex-col items-center justify-center p-6 text-center">
+            <Title className="text-xl text-red-600 mb-2">Access Denied</Title>
+            <Text className="text-gray-500 mb-6 text-sm">
+              이 초대 링크는 일회성이며 이미 사용되었거나 만료되었습니다.<br />
+              관리자에게 문의하여 새로운 초대 링크를 요청해 주세요.
+            </Text>
+            <Button2 type="primary" onClick={() => window.location.href = "/ui/login"}>
+              Go to Login
+            </Button2>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-md mt-10">
       <Card>

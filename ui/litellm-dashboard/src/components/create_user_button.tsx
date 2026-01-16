@@ -174,8 +174,7 @@ const Createuser: React.FC<CreateuserProps> = ({
       form.resetFields();
       localStorage.removeItem("userData" + userID);
     } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || error?.message || "Error creating the user";
-      NotificationsManager.fromBackend(errorMessage);
+      NotificationsManager.fromBackend(error);
       console.error("Error creating the user:", error);
     }
   };

@@ -15,6 +15,8 @@ import asyncio
 import traceback
 import os
 import json
+import re
+import uuid
 from typing import cast
 
 from litellm.proxy.management_endpoints.key_management_endpoints import delete_key_fn
@@ -371,24 +373,13 @@ async def new_user(
     - object_permission: Optional[LiteLLM_ObjectPermissionBase] - internal user-specific object permission. Example - {"vector_stores": ["vector_store_1", "vector_store_2"]}. IF null or {} then no object permission.
     - prompts: Optional[List[str]] - List of allowed prompts for the user. If specified, the user will only be able to use these specific prompts.
     - organizations: List[str] - List of organization id's the user is a member of
-    Returns:
-    - key: (str) The generated api key for the user
-    - expires: (datetime) Datetime object for when key expires.
-    - user_id: (str) Unique user id - used for tracking spend across multiple keys for same user id.
-    - max_budget: (float|None) Max budget for given user.
-
-    Usage Example 
-
-    ```shell
-     curl -X POST "http://localhost:4000/user/new" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer sk-1234" \
-     -d '{
-         "username": "new_user",
-         "email": "new_user@example.com"
-     }'
-    ```
     """
+    if data.password:
+        try:
+            _validate_password_complexity(data.password, data.user_id, data.user_email)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     try:
         from litellm.proxy.proxy_server import _license_check, prisma_client
 
