@@ -12,7 +12,7 @@ import {
 } from "@/components/networking";
 import { jwtDecode } from "jwt-decode";
 import { Form, Button as Button2 } from "antd";
-import { getCookie, setAuthToken } from "@/utils/cookieUtils";
+import { getCookie } from "@/utils/cookieUtils";
 
 export default function Onboarding() {
   const [form] = Form.useForm();
@@ -89,7 +89,7 @@ export default function Onboarding() {
       return;
     }
     claimOnboardingToken(accessToken, inviteID, userID, formValues.password)
-      .then((data) => {
+      .then(() => {
         const proxyBaseUrl = getProxyBaseUrl();
         console.log("proxyBaseUrl:", proxyBaseUrl);
 
