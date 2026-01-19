@@ -217,7 +217,7 @@ class ResetBudgetJob:
 
         Catches Exceptions and logs them
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         start_time = time.time()
         keys_to_reset: Optional[List[LiteLLM_VerificationToken]] = None
         try:
@@ -303,7 +303,7 @@ class ResetBudgetJob:
         """
         Resets the budget for all LiteLLM Internal Users if their budget has expired
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         start_time = time.time()
         users_to_reset: Optional[List[LiteLLM_UserTable]] = None
         try:
@@ -394,7 +394,7 @@ class ResetBudgetJob:
         """
         Resets the budget for all LiteLLM Internal Teams if their budget has expired
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         start_time = time.time()
         teams_to_reset: Optional[List[LiteLLM_TeamTable]] = None
         try:

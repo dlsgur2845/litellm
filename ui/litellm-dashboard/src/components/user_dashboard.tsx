@@ -17,7 +17,7 @@ import { useSearchParams } from "next/navigation";
 import { KeyResponse, Team } from "./key_team_helpers/key_list";
 import { jwtDecode } from "jwt-decode";
 import { Typography } from "antd";
-import { clearTokenCookies, getCookie } from "@/utils/cookieUtils";
+import { removeAuthToken, getAuthToken } from "@/utils/cookieUtils";
 
 export interface ProxySettings {
   PROXY_BASE_URL: string | null;
@@ -80,7 +80,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   // Assuming useSearchParams() hook exists and works in your setup
   const searchParams = useSearchParams()!;
 
-  const token = getCookie("token");
+  const token = getAuthToken();
 
   const invitation_id = searchParams.get("invitation_id");
 
@@ -263,7 +263,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
 
   function gotoLogin() {
     // Clear token cookies using the utility function
-    clearTokenCookies();
+    removeAuthToken();
 
     const baseUrl = getProxyBaseUrl();
 
@@ -302,7 +302,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     } catch (error) {
       console.error("Error decoding token:", error);
       // If there's an error decoding the token, consider it invalid
-      clearTokenCookies();
+      removeAuthToken();
 
       gotoLogin();
 

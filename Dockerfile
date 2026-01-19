@@ -75,7 +75,7 @@ RUN if [ "$PROXY_EXTRAS_SOURCE" = "local" ]; then \
 
 # Pre-cache Prisma binaries in the builder stage
 ENV PRISMA_BINARY_CACHE_DIR=/app/.cache/prisma-python/binaries \
-    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x,linux-arm64-openssl-3.0.x" \
+    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x,linux-arm64-openssl-3.0.x,linux-musl-openssl-3.0.x" \
     XDG_CACHE_HOME=/app/.cache \
     PATH="/usr/lib/python3.13/site-packages/nodejs/bin:${PATH}"
 
@@ -125,7 +125,7 @@ COPY --from=builder /usr/bin/prisma /usr/bin/prisma
 
 # Final runtime environment configuration
 ENV PRISMA_BINARY_CACHE_DIR=/app/.cache/prisma-python/binaries \
-    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x,linux-arm64-openssl-3.0.x" \
+    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x,linux-arm64-openssl-3.0.x,linux-musl-openssl-3.0.x" \
     HOME=/app \
     LITELLM_NON_ROOT=true \
     XDG_CACHE_HOME=/app/.cache

@@ -90,7 +90,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const isLocal = process.env.NODE_ENV === "development";
   if (isLocal != true) {
-    console.log = function () {};
+    console.log = function () { };
   }
 
   const baseUrl = useBaseUrl();

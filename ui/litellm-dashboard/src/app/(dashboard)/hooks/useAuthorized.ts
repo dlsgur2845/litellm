@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
-import { clearTokenCookies, getCookie } from "@/utils/cookieUtils";
+import { removeAuthToken, getAuthToken } from "@/utils/cookieUtils";
 import { getProxyBaseUrl } from "@/components/networking";
 
 function formatUserRole(userRole: string) {
@@ -38,7 +38,7 @@ function formatUserRole(userRole: string) {
 const useAuthorized = () => {
   const router = useRouter();
 
-  const token = typeof document !== "undefined" ? getCookie("token") : null;
+  const token = typeof document !== "undefined" ? getAuthToken() : null;
 
   // Redirect after mount if missing/invalid token
   useEffect(() => {
@@ -54,7 +54,7 @@ const useAuthorized = () => {
       return jwtDecode(token) as Record<string, any>;
     } catch {
       // Bad token in cookie — clear and bounce
-      clearTokenCookies();
+      removeAuthToken();
       router.replace(`${getProxyBaseUrl()}/ui/login`);
       return null;
     }

@@ -15,7 +15,7 @@ Endpoints here:
 
 import importlib
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 from fastapi import (
@@ -93,7 +93,7 @@ if MCP_AVAILABLE:
         if not _temporary_mcp_servers:
             return
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired_ids = [
             server_id
             for server_id, entry in _temporary_mcp_servers.items()
@@ -105,7 +105,7 @@ if MCP_AVAILABLE:
     def _cache_temporary_mcp_server(server: MCPServer, ttl_seconds: int) -> MCPServer:
         ttl_seconds = max(1, ttl_seconds)
         _prune_expired_temporary_mcp_servers()
-        expires_at = datetime.utcnow() + timedelta(seconds=ttl_seconds)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
         _temporary_mcp_servers[server.server_id] = _TemporaryMCPServerEntry(
             server=server,
             expires_at=expires_at,
@@ -183,7 +183,7 @@ if MCP_AVAILABLE:
         payload: NewMCPServerRequest,
         created_by: Optional[str],
     ) -> LiteLLM_MCPServerTable:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         server_id = payload.server_id or str(uuid.uuid4())
         server_name = payload.server_name or payload.alias or server_id
         return LiteLLM_MCPServerTable(

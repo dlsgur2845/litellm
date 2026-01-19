@@ -27,7 +27,7 @@ export async function makeOpenAIChatCompletionRequest(
   // base url should be the current base_url
   const isLocal = process.env.NODE_ENV === "development";
   if (isLocal !== true) {
-    console.log = function () {};
+    console.log = function () { };
   }
   console.log("isLocal:", isLocal);
   const proxyBaseUrl = getProxyBaseUrl();
@@ -57,17 +57,17 @@ export async function makeOpenAIChatCompletionRequest(
     const tools =
       selectedMCPTools && selectedMCPTools.length > 0
         ? [
-            {
-              type: "mcp",
-              server_label: "litellm",
-              server_url: `${proxyBaseUrl}/mcp`,
-              require_approval: "never",
-              allowed_tools: selectedMCPTools,
-              headers: {
-                "x-litellm-api-key": `Bearer ${accessToken}`,
-              },
+          {
+            type: "mcp",
+            server_label: "litellm",
+            server_url: `${proxyBaseUrl}/mcp`,
+            require_approval: "never",
+            allowed_tools: selectedMCPTools,
+            headers: {
+              "x-litellm-api-key": `Bearer ${accessToken}`,
             },
-          ]
+          },
+        ]
         : undefined;
 
     // @ts-ignore

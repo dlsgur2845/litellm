@@ -4,7 +4,7 @@ import { useLogin } from "@/app/(dashboard)/hooks/login/useLogin";
 import { useUIConfig } from "@/app/(dashboard)/hooks/uiConfig/useUIConfig";
 import LoadingScreen from "@/components/common_components/LoadingScreen";
 import { getProxyBaseUrl } from "@/components/networking";
-import { getCookie, setAuthToken } from "@/utils/cookieUtils";
+import { getAuthToken, setAuthToken } from "@/utils/cookieUtils";
 import { isJwtExpired } from "@/utils/jwtUtils";
 import { InfoCircleOutlined } from "@ant-design/icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -25,9 +25,11 @@ function LoginPageContent() {
       return;
     }
 
-    const rawToken = getCookie("token");
+    const rawToken = getAuthToken();
     if (rawToken && !isJwtExpired(rawToken)) {
-      router.replace(`${getProxyBaseUrl()}/ui`);
+      // Force relative path to avoid origin mismatch (e.g. port 4000 vs 443)
+      // data.redirect_url from backend might have absolute URL with internal port
+      router.replace("/ui");
       return;
     }
 
@@ -47,7 +49,8 @@ function LoginPageContent() {
           if (data.token) {
             setAuthToken(data.token);
           }
-          router.push(data.redirect_url);
+          // Force relative redirect to handle origin mismatches (e.g. Nginx vs Internal Port)
+          router.push("/ui");
         },
       },
     );

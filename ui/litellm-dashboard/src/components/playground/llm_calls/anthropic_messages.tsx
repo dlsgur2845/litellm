@@ -25,7 +25,7 @@ export async function makeAnthropicMessagesRequest(
 
   const isLocal = process.env.NODE_ENV === "development";
   if (isLocal !== true) {
-    console.log = function () {};
+    console.log = function () { };
   }
 
   const proxyBaseUrl = getProxyBaseUrl();
@@ -51,17 +51,17 @@ export async function makeAnthropicMessagesRequest(
     const tools =
       selectedMCPTools && selectedMCPTools.length > 0
         ? [
-            {
-              type: "mcp",
-              server_label: "litellm",
-              server_url: `${proxyBaseUrl}/mcp`,
-              require_approval: "never",
-              allowed_tools: selectedMCPTools,
-              headers: {
-                "x-litellm-api-key": `Bearer ${accessToken}`,
-              },
+          {
+            type: "mcp",
+            server_label: "litellm",
+            server_url: `${proxyBaseUrl}/mcp`,
+            require_approval: "never",
+            allowed_tools: selectedMCPTools,
+            headers: {
+              "x-litellm-api-key": `Bearer ${accessToken}`,
             },
-          ]
+          },
+        ]
         : undefined;
 
     const requestBody: any = {

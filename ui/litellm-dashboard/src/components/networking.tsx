@@ -39,7 +39,7 @@ export const getCallbackConfigsCall = async (accessToken: string) => {
  * Helper file for calls being made to proxy
  */
 import { message } from "antd";
-import { clearTokenCookies } from "@/utils/cookieUtils";
+import { removeAuthToken } from "@/utils/cookieUtils";
 import { TagNewRequest, TagUpdateRequest, TagListResponse, TagInfoResponse } from "./tag_management/types";
 import { Team } from "./key_team_helpers/key_list";
 import { UserInfo } from "./view_users/types";
@@ -246,9 +246,10 @@ const handleError = async (errorData: string | any) => {
     // Convert errorData to string if it isn't already
     const errorString = typeof errorData === "string" ? errorData : JSON.stringify(errorData);
     if (errorString.includes("Authentication Error - Expired Key")) {
+      console.log("handleError: Triggering logout due to 'Authentication Error - Expired Key'", errorString);
       NotificationsManager.info("UI Session Expired. Logging out.");
       lastErrorTime = currentTime;
-      clearTokenCookies();
+      removeAuthToken();
       const browserLocation = getWindowLocation();
       if (browserLocation) {
         window.location.href = browserLocation.pathname;

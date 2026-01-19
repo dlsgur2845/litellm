@@ -21,7 +21,7 @@ interface FallbacksProps {
 async function testFallbackModelResponse(selectedModel: string, accessToken: string) {
   const isLocal = process.env.NODE_ENV === "development";
   if (isLocal != true) {
-    console.log = function () {};
+    console.log = function () { };
   }
   const proxyBaseUrl = isLocal ? "http://localhost:4000" : window.location.origin;
   const client = new openai.OpenAI({

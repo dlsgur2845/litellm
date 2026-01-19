@@ -11,7 +11,7 @@ import sys
 import time
 import traceback
 import warnings
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -8581,7 +8581,7 @@ async def login(request: Request):  # noqa: PLR0915
 
     # Add JTI and Expiry
     token_expiry_minutes = int(os.getenv("LITELLM_TOKEN_EXPIRY_MINUTES", "60"))
-    expiry_time = datetime.utcnow() + timedelta(minutes=token_expiry_minutes)
+    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=token_expiry_minutes)
     jti = str(uuid.uuid4())
 
     returned_ui_token_object["exp"] = int(expiry_time.timestamp())
@@ -8674,7 +8674,7 @@ async def login_v2(request: Request):  # noqa: PLR0915
 
         # Add JTI and Expiry
         token_expiry_minutes = int(os.getenv("LITELLM_TOKEN_EXPIRY_MINUTES", "60"))
-        expiry_time = datetime.utcnow() + timedelta(minutes=token_expiry_minutes)
+        expiry_time = datetime.now(timezone.utc) + timedelta(minutes=token_expiry_minutes)
         jti = str(uuid.uuid4())
 
         returned_ui_token_object["exp"] = int(expiry_time.timestamp())
@@ -8885,7 +8885,7 @@ async def refresh_token(request: Request):
 
         # Generate new JTI and Expiry
         token_expiry_minutes = int(os.getenv("LITELLM_TOKEN_EXPIRY_MINUTES", "60"))
-        expiry_time = datetime.utcnow() + timedelta(minutes=token_expiry_minutes)
+        expiry_time = datetime.now(timezone.utc) + timedelta(minutes=token_expiry_minutes)
         new_jti = str(uuid.uuid4())
         
         payload["exp"] = int(expiry_time.timestamp())

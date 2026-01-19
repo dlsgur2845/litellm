@@ -17,7 +17,7 @@ import { Team } from "@/components/key_team_helpers/key_list";
 import { MCPServers } from "@/components/mcp_tools";
 import ModelHubTable from "@/components/model_hub_table";
 import Navbar from "@/components/navbar";
-import { getCookie, setAuthToken, clearTokenCookies } from "@/utils/cookieUtils";
+import { getAuthToken, setAuthToken, removeAuthToken } from "@/utils/cookieUtils";
 import { getUiConfig, Organization, proxyBaseUrl, setGlobalLitellmHeaderName } from "@/components/networking";
 import NewUsagePage from "@/components/UsagePage/components/UsagePageView";
 import OldTeams from "@/components/OldTeams";
@@ -147,24 +147,32 @@ export default function CreateKeyPage() {
         // proceed regardless; we still need to decide auth state
       }
 
+      console.log("CreateKeyPage: Checking auth token logic");
+
       if (cancelled) return;
 
       // Check URL for token (SSO/Redirect flow)
       const urlToken = searchParams.get("token");
       if (urlToken) {
+        console.log("CreateKeyPage: Found token in URL", urlToken);
         setAuthToken(urlToken);
         // Remove from URL to be clean
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
       }
 
-      const raw = getCookie("token");
-      const valid = raw && !isJwtExpired(raw) ? raw : null;
+      const raw = getAuthToken();
+      console.log("CreateKeyPage: Raw token from sessionStorage", raw);
+      const isExpired = raw ? isJwtExpired(raw) : true;
+      console.log("CreateKeyPage: Is token expired?", isExpired);
+
+      const valid = raw && !isExpired ? raw : null;
 
       // If token exists but is invalid/expired, clear it so downstream code
       // doesn't keep trying to use it and cause redirect spasms.
       if (raw && !valid) {
-        clearTokenCookies();
+        console.log("CreateKeyPage: Clearing invalid/expired token");
+        removeAuthToken();
       }
 
       if (!cancelled) {
@@ -179,9 +187,11 @@ export default function CreateKeyPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    console.log("CreateKeyPage: redirectToLogin effect", { redirectToLogin, authLoading, token, invitation_id });
     if (redirectToLogin) {
       // Replace instead of assigning to avoid back-button loops
       const dest = (proxyBaseUrl || "") + "/ui/login";
+      console.log("CreateKeyPage: Redirecting to", dest);
       window.location.replace(dest);
     }
   }, [redirectToLogin]);
@@ -193,7 +203,7 @@ export default function CreateKeyPage() {
 
     // Defensive: re-check expiry in case cookie changed after mount
     if (isJwtExpired(token)) {
-      clearTokenCookies();
+      removeAuthToken();
       setToken(null);
       return;
     }
@@ -203,7 +213,7 @@ export default function CreateKeyPage() {
       decoded = jwtDecode(token);
     } catch {
       // Malformed token → treat as unauthenticated
-      clearTokenCookies();
+      removeAuthToken();
       setToken(null);
       return;
     }

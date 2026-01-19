@@ -12,7 +12,7 @@ All /budget management endpoints
 """
 
 #### BUDGET TABLE MANAGEMENT ####
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -57,7 +57,7 @@ async def new_budget(
 
     # if no budget_reset_at date is set, but a budget_duration is given, then set budget_reset_at initially to the first completed duration interval in future
     if budget_obj.budget_reset_at is None and budget_obj.budget_duration is not None:
-        budget_obj.budget_reset_at = datetime.utcnow() + timedelta(
+        budget_obj.budget_reset_at = datetime.now(timezone.utc) + timedelta(
             seconds=duration_in_seconds(duration=budget_obj.budget_duration)
         )
 
