@@ -720,8 +720,9 @@ async def _user_api_key_auth_builder(  # noqa: PLR0915
 
         ## Check UI Hash Key
         if valid_token is None and get_secret_bool("EXPERIMENTAL_UI_LOGIN"):
-            valid_token = ExperimentalUIJWTToken.get_key_object_from_ui_hash_key(
-                api_key
+            valid_token = await ExperimentalUIJWTToken.get_key_object_from_ui_hash_key(
+                hashed_token=api_key,
+                prisma_client=prisma_client,
             )
 
         if (

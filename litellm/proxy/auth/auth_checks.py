@@ -1458,8 +1458,9 @@ class ExperimentalUIJWTToken:
         return encrypt_value_helper(valid_token.model_dump_json(exclude_none=True))
 
     @staticmethod
-    def get_key_object_from_ui_hash_key(
+    async def get_key_object_from_ui_hash_key(
         hashed_token: str,
+        prisma_client: Optional[PrismaClient] = None,
     ) -> Optional[UserAPIKeyAuth]:
         import json
 
@@ -1474,7 +1475,30 @@ class ExperimentalUIJWTToken:
         if decrypted_token is None:
             return None
         try:
-            return UserAPIKeyAuth(**json.loads(decrypted_token))
+            token_dict = json.loads(decrypted_token)
+            
+            # JTI Validation
+            if prisma_client is not None:
+                user_id = token_dict.get("user_id")
+                jti = token_dict.get("jti")
+                
+                if user_id:
+                     user_in_db = await prisma_client.db.litellm_usertable.find_unique(where={"user_id": user_id})
+                     if user_in_db:
+                          current_metadata = user_in_db.metadata or {}
+                          if isinstance(current_metadata, str):
+                              try:
+                                  current_metadata = json.loads(current_metadata)
+                              except:
+                                  current_metadata = {}
+                          
+                          active_jti = current_metadata.get("active_token_jti")
+                          if active_jti and jti and active_jti != jti:
+                               from litellm.proxy.utils import verbose_proxy_logger
+                               verbose_proxy_logger.error(f"Token invalidated. Active JTI: {active_jti}, Token JTI: {jti}")
+                               raise Exception("Token has been invalidated (concurrent login detected)")
+
+            return UserAPIKeyAuth(**token_dict)
         except Exception as e:
             raise Exception(
                 f"Invalid hash key. Hash key={hashed_token}. Decrypted token={decrypted_token}. Error: {e}"
