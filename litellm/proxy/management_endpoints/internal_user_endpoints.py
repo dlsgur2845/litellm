@@ -677,6 +677,11 @@ async def user_info(
         _user_info = (
             user_info.model_dump() if isinstance(user_info, BaseModel) else user_info
         )
+        
+        # Remove password from user info
+        if "password" in _user_info:
+            _user_info.pop("password")
+
         response_data = UserInfoResponse(
             user_id=user_id, user_info=_user_info, keys=returned_keys, teams=team_list
         )
