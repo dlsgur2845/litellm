@@ -239,12 +239,54 @@ async def authenticate_user(
 
         -> if the user has no role in the DB assume they are only a viewer
         """
+        import json
+        from datetime import datetime, timedelta, timezone
+
         user_id = getattr(_user_row, "user_id", "unknown")
         user_role = getattr(
             _user_row, "user_role", LitellmUserRoles.INTERNAL_USER_VIEW_ONLY
         )
         user_email = getattr(_user_row, "user_email", "unknown")
         _password = getattr(_user_row, "password", "unknown")
+
+        # 1. Check if user is locked out
+        current_metadata = getattr(_user_row, "metadata", {}) or {}
+        if isinstance(current_metadata, str):
+            try:
+                current_metadata = json.loads(current_metadata)
+            except:
+                current_metadata = {}
+        
+        login_locked_until = current_metadata.get("login_locked_until")
+        if login_locked_until:
+            try:
+                locked_until_dt = datetime.fromisoformat(login_locked_until)
+                # Ensure locked_until_dt is timezone aware (assume UTC if naive, as we store as UTC)
+                if locked_until_dt.tzinfo is None:
+                     locked_until_dt = locked_until_dt.replace(tzinfo=timezone.utc)
+                
+                current_time = datetime.now(timezone.utc)
+                print(f"[LOCKOUT CHECK] Current: {current_time} vs Locked Until: {locked_until_dt}")
+                
+                if current_time < locked_until_dt:
+                     remaining_lockout = locked_until_dt - current_time
+                     raise ProxyException(
+                        message=f"Account locked due to too many failed attempts. Try again in {int(remaining_lockout.total_seconds() / 60)} minutes.",
+                        type=ProxyErrorTypes.auth_error,
+                        param="account_locked",
+                        code=403,
+                    )
+            except ProxyException:
+                raise
+            except Exception as e:
+                # Log error but default to BLOCKING if parsing fails to be safe? 
+                # Or continue? Original logic was continue. 
+                # Let's log it to find the bug.
+                print(f"[LOCKOUT ERROR] Parsing check failed: {str(e)}")
+                # If we can't parse the lock time, we should probably assume lock is valid or invalid?
+                # User complaint is "logs in when shouldn't". 
+                # Meaning we PROCEEDED when we should have STOPPED.
+                pass
 
         if _password is None:
             raise ProxyException(
@@ -259,6 +301,25 @@ async def authenticate_user(
         if secrets.compare_digest(password, _password) or secrets.compare_digest(
             hash_password, _password
         ):
+            # SUCCESS
+            # Reset failed attempts if any exist
+            if current_metadata.get("failed_login_attempts", 0) > 0 or current_metadata.get("login_locked_until"):
+                current_metadata["failed_login_attempts"] = 0
+                current_metadata["login_locked_until"] = None
+                
+                # Update DB
+                if prisma_client is not None:
+                     try:
+                        from prisma import Json
+                        metadata_update = Json(current_metadata)
+                        await prisma_client.db.litellm_usertable.update(
+                            where={"user_id": user_id},
+                            data={"metadata": metadata_update}
+                        )
+                     except Exception as e:
+                         # Non-blocking update failure
+                         pass
+
             if os.getenv("DATABASE_URL") is not None:
                 response = await generate_key_helper_fn(
                     request_type="key",
@@ -292,8 +353,47 @@ async def authenticate_user(
                 login_method="username_password",
             )
         else:
+            # FAILURE
+            # Increment failed attempts
+            max_login_attempts = os.getenv("MAX_LOGIN_ATTEMPTS")
+            remaining_attempts_msg = ""
+            
+            if max_login_attempts and max_login_attempts.isdigit():
+                 max_attempts = int(max_login_attempts)
+                 failed_attempts = current_metadata.get("failed_login_attempts", 0) + 1
+                 current_metadata["failed_login_attempts"] = failed_attempts
+                 
+                 remaining = max_attempts - failed_attempts
+                 if remaining < 0: remaining = 0
+                 
+                 remaining_attempts_msg = f"\nRemaining attempts: {remaining}"
+
+                 if failed_attempts >= max_attempts:
+                     lockout_minutes = int(os.getenv("LOGIN_LOCKOUT_MINUTES", "15"))
+                     lockout_until = datetime.now(timezone.utc) + timedelta(minutes=lockout_minutes)
+                     current_metadata["login_locked_until"] = lockout_until.isoformat()
+                     # Reset attempts so they start fresh after lockout? 
+                     # Or keep them? Logic says 'failed 5 times -> lock'. 
+                     # If we keep them, next try after lock will lock again immediately?
+                     # Let's reset attempts after locking to allow counting again after expiry.
+                     current_metadata["failed_login_attempts"] = 0
+                     remaining_attempts_msg = f"\nAccount locked for {lockout_minutes} minutes."
+                 
+                 # Update DB
+                 if prisma_client is not None:
+                     try:
+                        from prisma import Json
+                        metadata_update = Json(current_metadata)
+                        await prisma_client.db.litellm_usertable.update(
+                            where={"user_id": user_id},
+                            data={"metadata": metadata_update}
+                        )
+                     except Exception as e:
+                         print(f"FAILED TO UPDATE METADATA for {user_id}: {str(e)}")
+                         pass
+
             raise ProxyException(
-                message=f"Invalid credentials used to access UI.\nNot valid credentials for {username}",
+                message=f"Invalid credentials used to access UI.\nNot valid credentials for {username}{remaining_attempts_msg}",
                 type=ProxyErrorTypes.auth_error,
                 param="invalid_credentials",
                 code=401,

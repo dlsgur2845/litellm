@@ -9109,6 +9109,12 @@ async def claim_onboarding_link(data: InvitationClaim):
 
     if invite_obj.is_accepted is True:
         # this is a valid invite that was accepted
+        # Check if it was already used to set a password
+        if invite_obj.accepted_at and invite_obj.updated_at and invite_obj.updated_at > invite_obj.accepted_at:
+             raise HTTPException(
+                status_code=401,
+                detail="Invitation link has already been used to set a password."
+            )
         pass
     else:
         raise HTTPException(
@@ -9138,6 +9144,13 @@ async def claim_onboarding_link(data: InvitationClaim):
         raise HTTPException(
             status_code=401, detail={"error": "User does not exist in db."}
         )
+
+    
+    # Mark invitation as used (update timestamp so next check fails)
+    await prisma_client.db.litellm_invitationlink.update(
+        where={"id": invite_obj.id},
+        data={"updated_at": litellm.utils.get_utc_datetime()}
+    )
 
     return user_obj
 
