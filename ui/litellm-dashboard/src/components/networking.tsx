@@ -239,6 +239,18 @@ export interface CredentialsResponse {
 
 let lastErrorTime = 0;
 
+const checkResponseAuth = async (response: Response) => {
+  if (response.status === 401) {
+    message.error("Logged in from another PC. Redirecting to login...");
+    removeAuthToken();
+    const browserLocation = getWindowLocation();
+    if (browserLocation) {
+      window.location.href = "/login";
+    }
+    throw new Error("401 Unauthorized - Redirecting");
+  }
+};
+
 const handleError = async (errorData: string | any) => {
   const currentTime = Date.now();
   if (currentTime - lastErrorTime > 60000) {
@@ -1200,6 +1212,10 @@ export const userInfoCall = async (
       },
     });
 
+
+
+    await checkResponseAuth(response);
+
     if (!response.ok) {
       const errorData = await response.json();
       const errorMessage = deriveErrorMessage(errorData);
@@ -1230,6 +1246,10 @@ export const teamInfoCall = async (accessToken: string, teamID: string | null) =
         "Content-Type": "application/json",
       },
     });
+
+
+
+    await checkResponseAuth(response);
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -3309,6 +3329,10 @@ export const keyListCall = async (
         "Content-Type": "application/json",
       },
     });
+
+
+
+    await checkResponseAuth(response);
 
     if (!response.ok) {
       const errorData = await response.json();

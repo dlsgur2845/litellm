@@ -21,13 +21,12 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
     // Manual renewal cooldown state
     const [renewCooldown, setRenewCooldown] = useState(false);
 
-    // Determines when to show the popup (default 60s, but 10s if short lived)
-    const [warningThreshold, setWarningThreshold] = useState(60000);
-
     useEffect(() => {
         if (!token) return;
 
         let expirationTime: number | null = null;
+        let calculatedThreshold = 60000; // Default 60s
+
         try {
             const decoded: any = jwtDecode(token);
             console.log("TokenExpirationTimer: Decoded token", decoded);
@@ -40,9 +39,7 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
                     const totalDuration = expirationTime - iatTime;
                     // If total duration is small (<= 90 seconds to be safe), warn only 10s before
                     if (totalDuration <= 90000) {
-                        setWarningThreshold(10000);
-                    } else {
-                        setWarningThreshold(60000);
+                        calculatedThreshold = 10000;
                     }
                 }
             } else {
@@ -66,14 +63,14 @@ const TokenExpirationTimer: React.FC<TokenExpirationTimerProps> = ({ token }) =>
                 setTimeRemaining(diff);
 
                 // Show modal based on adaptive threshold
-                if (diff < warningThreshold && !showRenewalModal) {
+                if (diff < calculatedThreshold && !showRenewalModal) {
                     setShowRenewalModal(true);
                 }
             }
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [token, showRenewalModal, warningThreshold]);
+    }, [token, showRenewalModal]);
 
     const handleLogout = async () => {
         await clearTokenCookies();
