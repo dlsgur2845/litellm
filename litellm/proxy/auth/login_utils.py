@@ -12,6 +12,7 @@ from typing import Literal, Optional, cast
 from fastapi import HTTPException
 
 import litellm
+from litellm._logging import verbose_proxy_logger
 from litellm.constants import LITELLM_PROXY_ADMIN_NAME
 from litellm.proxy._types import (
     LiteLLM_UserTable,
@@ -22,6 +23,7 @@ from litellm.proxy._types import (
     UserAPIKeyAuth,
     hash_token,
 )
+from litellm.proxy.auth.auth_checks import _delete_cache_key_object
 from litellm.proxy.management_endpoints.internal_user_endpoints import user_update
 from litellm.proxy.management_endpoints.key_management_endpoints import (
     generate_key_helper_fn,
@@ -29,7 +31,7 @@ from litellm.proxy.management_endpoints.key_management_endpoints import (
 from litellm.proxy.management_endpoints.ui_sso import (
     get_disabled_non_admin_personal_key_creation,
 )
-from litellm.proxy.utils import PrismaClient, get_server_root_path
+from litellm.proxy.utils import PrismaClient, get_server_root_path, _hash_token_if_needed
 from litellm.secret_managers.main import get_secret_bool
 from litellm.types.proxy.ui_sso import ReturnedUITokenObject
 
@@ -174,6 +176,44 @@ async def authenticate_user(
         )
 
         if os.getenv("DATABASE_URL") is not None:
+             # Enforce Single Active Token Policy: Delete existing dashboard keys for this user
+            if prisma_client is not None:
+                try:
+                    # 1. Find the keys to be deleted
+                    old_keys = await prisma_client.db.litellm_verificationtoken.find_many(
+                        where={"user_id": key_user_id, "team_id": "litellm-dashboard"}
+                    )
+                    
+                    tokens_to_delete = [
+                            _hash_token_if_needed(k.token) for k in old_keys
+                    ]
+                    
+                    if tokens_to_delete:
+                            # 2. Use the wrapper's delete_data to ensure Cache Invalidation (Partial)
+                            await prisma_client.delete_data(tokens=tokens_to_delete)
+                            
+                            # 3. Explicitly invalidate cache using auth_checks helper
+                            try:
+                                from litellm.proxy.proxy_server import (
+                                    proxy_logging_obj,
+                                    user_api_key_cache,
+                                )
+
+                                for token in tokens_to_delete:
+                                    await _delete_cache_key_object(
+                                        hashed_token=token,
+                                        user_api_key_cache=user_api_key_cache,
+                                        proxy_logging_obj=proxy_logging_obj,
+                                    )
+                                verbose_proxy_logger.info(f"Invalidated cache for {len(tokens_to_delete)} tokens")
+                            except Exception as e:
+                                verbose_proxy_logger.error(f"Failed to invalidate cache: {str(e)}")
+
+                            verbose_proxy_logger.info(f"Revoked {len(tokens_to_delete)} old dashboard keys for admin {key_user_id}")
+                            
+                except Exception as e:
+                    verbose_proxy_logger.error(f"Failed to cleanup old dashboard keys: {str(e)}")
+
             response = await generate_key_helper_fn(
                 request_type="key",
                 **{
@@ -321,6 +361,45 @@ async def authenticate_user(
                          pass
 
             if os.getenv("DATABASE_URL") is not None:
+                # Enforce Single Active Token Policy: Delete existing dashboard keys for this user
+                if prisma_client is not None:
+                    try:
+                        # 1. Find the keys to be deleted
+                        old_keys = await prisma_client.db.litellm_verificationtoken.find_many(
+                            where={"user_id": user_id, "team_id": "litellm-dashboard"}
+                        )
+                        
+                        tokens_to_delete = [
+                             _hash_token_if_needed(k.token) for k in old_keys
+                        ]
+                        
+                        if tokens_to_delete:
+                             # 2. Use the wrapper's delete_data to ensure Cache Invalidation (Partial)
+                             await prisma_client.delete_data(tokens=tokens_to_delete)
+                             
+                             # 3. Explicitly invalidate cache using auth_checks helper
+                             try:
+                                 from litellm.proxy.proxy_server import (
+                                     proxy_logging_obj,
+                                     user_api_key_cache,
+                                 )
+
+                                 for token in tokens_to_delete:
+                                     await _delete_cache_key_object(
+                                         hashed_token=token,
+                                         user_api_key_cache=user_api_key_cache,
+                                         proxy_logging_obj=proxy_logging_obj,
+                                     )
+                                 verbose_proxy_logger.info(f"Invalidated cache for {len(tokens_to_delete)} tokens")
+                             except Exception as e:
+                                 verbose_proxy_logger.error(f"Failed to invalidate cache: {str(e)}")
+
+                             verbose_proxy_logger.info(f"Revoked {len(tokens_to_delete)} old dashboard keys for user {user_id}")
+
+                    except Exception as e:
+                         print(f"FAILED TO CLEANUP OLD KEYS: {str(e)}")
+                         verbose_proxy_logger.error(f"Failed to cleanup old dashboard keys: {str(e)}")
+
                 response = await generate_key_helper_fn(
                     request_type="key",
                     **{  # type: ignore
