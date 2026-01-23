@@ -8700,11 +8700,21 @@ async def login_v2(request: Request):  # noqa: PLR0915
                     if current_metadata.get("active_token_jti") != jti:
                       current_metadata["active_token_jti"] = jti
                       
+                      current_metadata["active_token_jti"] = jti
+                      
+                      # Force clean JSON serialization to remove non-serializable objects
+                      try:
+                          current_metadata = json.loads(json.dumps(current_metadata))
+                      except Exception as e:
+                          verbose_proxy_logger.error(f"Failed to serialize metadata in login: {e}")
+                          # fallback to empty dict with jti
+                          current_metadata = {"active_token_jti": jti}
+
                       try:
                           from prisma import Json
+                          metadata_update = Json(current_metadata)
                       except ImportError:
-                          pass
-                      metadata_update = Json(current_metadata) if 'Json' in locals() else current_metadata
+                          metadata_update = current_metadata
 
                       await prisma_client.db.litellm_usertable.update(
                           where={"user_id": login_result.user_id},
@@ -8792,6 +8802,19 @@ async def logout(request: Request):
         user_id = payload.get("user_id")
         
         if user_id and prisma_client is not None:
+             # Invalidate Cache
+             from litellm.proxy.auth.auth_checks import _delete_cache_key_object
+             if token.startswith("sk-") is False: 
+                # hash token
+                from litellm.proxy.utils import hash_token
+                token = hash_token(token)
+
+             await _delete_cache_key_object(
+                hashed_token=token,
+                user_api_key_cache=user_api_key_cache,
+                proxy_logging_obj=proxy_logging_obj,
+             )
+
              user_in_db = await prisma_client.db.litellm_usertable.find_unique(where={"user_id": user_id})
              if user_in_db:
                   current_metadata = user_in_db.metadata or {}
@@ -9022,6 +9045,39 @@ async def onboarding(invite_link: str, request: Request):
     else:
         litellm_dashboard_ui += "/ui/onboarding"
     import jwt
+    import uuid
+
+    jti = str(uuid.uuid4())
+
+    # Update user metadata with the JTI
+    # Retrieve current metadata first to avoid overwriting other fields
+    current_metadata = user_obj.metadata or {}
+    
+    # Ensure current_metadata is a dict
+    if not isinstance(current_metadata, dict):
+        current_metadata = {}
+
+    current_metadata["active_token_jti"] = jti
+    
+    # Force clean JSON serialization to remove non-serializable objects
+    import json
+    try:
+        current_metadata = json.loads(json.dumps(current_metadata))
+    except Exception as e:
+        verbose_proxy_logger.error(f"Failed to serialize metadata: {e}")
+        # fallback to empty dict with jti if serialization fails
+        current_metadata = {"active_token_jti": jti}
+
+    try:
+        from prisma import Json
+        metadata_update = Json(current_metadata)
+    except ImportError:
+        metadata_update = current_metadata
+
+    await prisma_client.db.litellm_usertable.update(
+        where={"user_id": user_obj.user_id},
+        data={"metadata": metadata_update}
+    )
 
     disabled_non_admin_personal_key_creation = (
         get_disabled_non_admin_personal_key_creation()
@@ -9039,6 +9095,7 @@ async def onboarding(invite_link: str, request: Request):
         ),
         disabled_non_admin_personal_key_creation=disabled_non_admin_personal_key_creation,
         server_root_path=get_server_root_path(),
+        jti=jti
     )
     jwt_token = jwt.encode(  # type: ignore
         cast(dict, returned_ui_token_object),
@@ -9055,7 +9112,7 @@ async def onboarding(invite_link: str, request: Request):
 
 
 @app.post("/onboarding/claim_token", include_in_schema=False)
-async def claim_onboarding_link(data: InvitationClaim):
+async def claim_onboarding_link(data: InvitationClaim, request: Request):
     """
     Special route. Allows UI link share user to update their password.
 
@@ -9067,7 +9124,7 @@ async def claim_onboarding_link(data: InvitationClaim):
 
     This route can only update user password.
     """
-    global prisma_client
+    global prisma_client, master_key
     
     # Check Password Complexity
     from litellm.proxy.management_endpoints.internal_user_endpoints import (
@@ -9136,15 +9193,69 @@ async def claim_onboarding_link(data: InvitationClaim):
         )
     ### UPDATE USER OBJECT ###
     hash_password = hash_token(token=data.password)
+
+    # Validate JTI if present
+    import jwt
+    auth_header = request.headers.get("Authorization")
+    jti = None
+    if auth_header:
+        try:
+            token = auth_header.split(" ")[1]
+            decoded = jwt.decode(token, master_key, algorithms=["HS256"])
+            jti = decoded.get("jti")
+        except Exception as e:
+            verbose_proxy_logger.warning(f"Error decoding token for JTI check: {e}")
+
+    # Fetch user to check metadata and update
+    user_obj_check = await prisma_client.db.litellm_usertable.find_unique(where={"user_id": invite_obj.user_id})
+    
+    updated_metadata = {}
+    if user_obj_check:
+        updated_metadata = user_obj_check.metadata or {}
+        stored_jti = updated_metadata.get("active_token_jti")
+        
+        # Enforce One-Time Use
+        if jti:
+            if stored_jti != jti:
+                 raise HTTPException(
+                    status_code=401, 
+                    detail="Invalid or expired onboarding token. Please request a new invite."
+                )
+            # If match, remove JTI to prevent reuse
+            updated_metadata.pop("active_token_jti", None)
+        elif stored_jti:
+             # If DB has JTI but token doesn't -> suspicious or using old token for new invite?
+             # For security, if we issued a JTI, we expect it back.
+             pass 
+
+    # Force clean JSON serialization to remove non-serializable objects
+    import json
+    try:
+        updated_metadata = json.loads(json.dumps(updated_metadata))
+    except Exception as e:
+        verbose_proxy_logger.error(f"Failed to serialize metadata: {e}")
+        # fallback to empty dict
+        updated_metadata = {}
+
+    try:
+        from prisma import Json
+        metadata_update = Json(updated_metadata)
+    except ImportError:
+        metadata_update = updated_metadata
+
     user_obj = await prisma_client.db.litellm_usertable.update(
-        where={"user_id": invite_obj.user_id}, data={"password": hash_password}
+        where={"user_id": invite_obj.user_id},
+        data={
+            "password": hash_password,
+            "metadata": metadata_update
+        }
     )
 
     if user_obj is None:
         raise HTTPException(
             status_code=401, detail={"error": "User does not exist in db."}
         )
-
+ 
     
     # Mark invitation as used (update timestamp so next check fails)
     await prisma_client.db.litellm_invitationlink.update(

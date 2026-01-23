@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 import litellm
 from litellm._logging import verbose_proxy_logger
 from litellm.proxy._types import *
+from litellm.proxy.auth.auth_checks import _delete_cache_key_object
 from litellm.proxy.auth.user_api_key_auth import user_api_key_auth
 from litellm.proxy.hooks.user_management_event_hooks import UserManagementEventHooks
 from litellm.proxy.management_endpoints.common_daily_activity import (
@@ -39,7 +40,7 @@ from litellm.proxy.management_endpoints.key_management_endpoints import (
     prepare_metadata_fields,
 )
 from litellm.proxy.management_helpers.utils import management_endpoint_wrapper
-from litellm.proxy.utils import handle_exception_on_proxy
+from litellm.proxy.utils import handle_exception_on_proxy, hash_token
 from litellm.types.proxy.management_endpoints.common_daily_activity import (
     SpendAnalyticsPaginatedResponse,
 )
@@ -1042,6 +1043,24 @@ async def _update_single_user_helper(
         except Exception as audit_error:
             verbose_proxy_logger.warning(
                 f"Failed to create audit log for user {response.get('user_id')}: {audit_error}"
+            )
+
+        # Invalidate all keys for the user
+        try:
+            from litellm.proxy.proxy_server import proxy_logging_obj, user_api_key_cache
+
+            user_keys = await prisma_client.db.litellm_verificationtoken.find_many(
+                where={"user_id": response["user_id"]}
+            )
+            for key in user_keys:
+                await _delete_cache_key_object(
+                    hashed_token=hash_token(key.token),
+                    user_api_key_cache=user_api_key_cache,
+                    proxy_logging_obj=proxy_logging_obj,
+                )
+        except Exception as e:
+            verbose_proxy_logger.warning(
+                f"Failed to invalidate cache for user {response.get('user_id')}: {e}"
             )
 
     if response is None:
