@@ -682,6 +682,10 @@ async def user_info(
         # Remove password from user info
         if "password" in _user_info:
             _user_info.pop("password")
+        
+        # Remove internal authentication fields from metadata
+        if "metadata" in _user_info and isinstance(_user_info["metadata"], dict):
+            _user_info["metadata"].pop("active_token_jti", None)
 
         response_data = UserInfoResponse(
             user_id=user_id, user_info=_user_info, keys=returned_keys, teams=team_list

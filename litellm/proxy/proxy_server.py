@@ -8775,9 +8775,11 @@ async def logout(request: Request):
     1. Validates the current token.
     2. Updates database to invalidate the current JTI (set active_token_jti to null).
     """
-    global master_key, prisma_client
+    global master_key, prisma_client, user_api_key_cache, proxy_logging_obj
     
     import jwt
+    from litellm.proxy.utils import _hash_token_if_needed
+    from litellm.proxy.auth.auth_checks import _delete_cache_key_object
     
     try:
         # Get token from cookie or header
@@ -8791,6 +8793,27 @@ async def logout(request: Request):
             # Already logged out or no token, just return success
             return JSONResponse(content={"status": "success", "message": "Logged out"})
 
+        # Handle standard API keys (Virtual Keys)
+        if token.startswith("sk-") and prisma_client is not None:
+            hashed_token = _hash_token_if_needed(token)
+            
+            # Check if this is a dashboard token
+            token_info = await prisma_client.db.litellm_verificationtoken.find_unique(
+                where={"token": hashed_token}
+            )
+
+            if token_info and token_info.team_id == "litellm-dashboard":
+                # Delete the token from DB
+                await prisma_client.delete_data(tokens=[hashed_token])
+                
+                # Invalidate cache
+                await _delete_cache_key_object(
+                    hashed_token=hashed_token,
+                    user_api_key_cache=user_api_key_cache,
+                    proxy_logging_obj=proxy_logging_obj
+                )
+                return JSONResponse(content={"status": "success", "message": "Logged out"})
+
         try:
              # Decode without verification to get user_id even if expired
              # We want to ensure we clear the DB record regardless
@@ -8800,6 +8823,7 @@ async def logout(request: Request):
              return JSONResponse(content={"status": "success", "message": "Logged out"})
 
         user_id = payload.get("user_id")
+        embedded_key = payload.get("key")  # JWT 안에 포함된 실제 sk-... 키
         
         if user_id and prisma_client is not None:
              # Invalidate Cache
@@ -8814,6 +8838,29 @@ async def logout(request: Request):
                 user_api_key_cache=user_api_key_cache,
                 proxy_logging_obj=proxy_logging_obj,
              )
+
+             # [FIX] Delete the embedded key from JWT if it exists
+             if embedded_key and embedded_key.startswith("sk-"):
+                 hashed_embedded_key = _hash_token_if_needed(embedded_key)
+                 
+                 # Verify this is a dashboard token before deleting
+                 token_info = await prisma_client.db.litellm_verificationtoken.find_unique(
+                     where={"token": hashed_embedded_key}
+                 )
+                 
+                 if token_info and token_info.team_id == "litellm-dashboard":
+                     await prisma_client.delete_data(tokens=[hashed_embedded_key])
+                     await _delete_cache_key_object(
+                         hashed_token=hashed_embedded_key,
+                         user_api_key_cache=user_api_key_cache,
+                         proxy_logging_obj=proxy_logging_obj,
+                     )
+                     verbose_proxy_logger.info(f"Deleted embedded dashboard key from JWT for {user_id}")
+
+             # [FIX] Invalidate the user cache so the updated JTI is recognized immediately
+             if user_api_key_cache is not None:
+                 user_api_key_cache.delete_cache(key=user_id)
+                 verbose_proxy_logger.info(f"Invalidated user cache for {user_id} during logout")
 
              user_in_db = await prisma_client.db.litellm_usertable.find_unique(where={"user_id": user_id})
              if user_in_db:
@@ -9103,9 +9150,7 @@ async def onboarding(invite_link: str, request: Request):
         algorithm="HS256",
     )
 
-    litellm_dashboard_ui += "?token={}&user_email={}".format(jwt_token, user_email)
     return {
-        "login_url": litellm_dashboard_ui,
         "token": jwt_token,
         "user_email": user_email,
     }
@@ -9262,6 +9307,45 @@ async def claim_onboarding_link(data: InvitationClaim, request: Request):
         where={"id": invite_obj.id},
         data={"updated_at": litellm.utils.get_utc_datetime()}
     )
+
+    # [SECURITY FIX] Delete the old onboarding token to prevent reuse
+    if jti and auth_header:
+        try:
+            from litellm.proxy.auth.auth_checks import _delete_cache_key_object
+            from litellm.proxy.proxy_server import user_api_key_cache, proxy_logging_obj
+            from litellm.proxy.utils import _hash_token_if_needed
+            
+            # Extract the embedded key from JWT
+            embedded_key = decoded.get("key")
+            
+            if embedded_key and embedded_key.startswith("sk-"):
+                hashed_embedded_key = _hash_token_if_needed(embedded_key)
+                
+                # Verify this is a dashboard/onboarding token before deleting
+                token_info = await prisma_client.db.litellm_verificationtoken.find_unique(
+                    where={"token": hashed_embedded_key}
+                )
+                
+                if token_info and token_info.team_id == "litellm-dashboard":
+                    # Delete from DB
+                    await prisma_client.delete_data(tokens=[hashed_embedded_key])
+                    
+                    # Invalidate cache
+                    await _delete_cache_key_object(
+                        hashed_token=hashed_embedded_key,
+                        user_api_key_cache=user_api_key_cache,
+                        proxy_logging_obj=proxy_logging_obj,
+                    )
+                    verbose_proxy_logger.info(f"Deleted onboarding token for user {user_obj.user_id}")
+            
+            # Also invalidate user cache to ensure fresh data on next login
+            if user_api_key_cache is not None:
+                user_api_key_cache.delete_cache(key=user_obj.user_id)
+                verbose_proxy_logger.info(f"Invalidated user cache for {user_obj.user_id}")
+                
+        except Exception as e:
+            verbose_proxy_logger.error(f"Failed to delete onboarding token: {str(e)}")
+            # Don't fail the password update if token deletion fails
 
     return user_obj
 

@@ -24,7 +24,6 @@ export default function Onboarding() {
   const [defaultUserEmail, setDefaultUserEmail] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
   const [userID, setUserID] = useState<string | null>(null);
-  const [loginUrl, setLoginUrl] = useState<string>("");
   const [jwtToken, setJwtToken] = useState<string>("");
   const [getUiConfigLoading, setGetUiConfigLoading] = useState<boolean>(true);
 
@@ -50,10 +49,6 @@ export default function Onboarding() {
 
     getOnboardingCredentials(inviteID)
       .then((data) => {
-        const login_url = data.login_url;
-        console.log("login_url:", login_url);
-        setLoginUrl(login_url);
-
         const token = data.token;
         const decoded = jwtDecode(token) as { [key: string]: any };
         setJwtToken(token);
@@ -89,14 +84,14 @@ export default function Onboarding() {
       return;
     }
     claimOnboardingToken(accessToken, inviteID, userID, formValues.password)
-      .then(() => {
-        const proxyBaseUrl = getProxyBaseUrl();
-        console.log("proxyBaseUrl:", proxyBaseUrl);
+      .then((response) => {
+        console.log("Password set successfully:", response);
 
-        // Construct the full redirect URL using the proxyBaseUrl which includes the server root path
+        const proxyBaseUrl = getProxyBaseUrl();
+
         // Redirect to login page so user can login with their new password
-        let redirectUrl = proxyBaseUrl ? `${proxyBaseUrl}/ui` : "/ui";
-        console.log("redirecting to:", redirectUrl);
+        let redirectUrl = proxyBaseUrl ? `${proxyBaseUrl}/ui/login` : "/ui/login";
+        console.log("Redirecting to login page:", redirectUrl);
 
         window.location.href = redirectUrl;
       })
@@ -104,8 +99,6 @@ export default function Onboarding() {
         console.error("Claim token failed:", error);
         NotificationsManager.fromBackend(error);
       });
-
-    // redirect to login page
   };
 
   if (errorState.isError) {
