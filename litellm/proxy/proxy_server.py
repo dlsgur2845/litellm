@@ -9243,6 +9243,7 @@ async def claim_onboarding_link(data: InvitationClaim, request: Request):
     import jwt
     auth_header = request.headers.get("Authorization")
     jti = None
+    decoded = None  # Initialize outside try block to ensure it's accessible later
     if auth_header:
         try:
             token = auth_header.split(" ")[1]
@@ -9309,14 +9310,31 @@ async def claim_onboarding_link(data: InvitationClaim, request: Request):
     )
 
     # [SECURITY FIX] Delete the old onboarding token to prevent reuse
-    if jti and auth_header:
+    # Independent JWT decoding to ensure token deletion even if earlier JTI check failed
+    if auth_header:
         try:
             from litellm.proxy.auth.auth_checks import _delete_cache_key_object
             from litellm.proxy.proxy_server import user_api_key_cache, proxy_logging_obj
             from litellm.proxy.utils import _hash_token_if_needed
+            import jwt
             
-            # Extract the embedded key from JWT
-            embedded_key = decoded.get("key")
+            # Try to decode JWT to get embedded key (independent of earlier decode)
+            embedded_key = None
+            
+            # Check if auth_header contains a direct sk- token (not JWT)
+            token_str = auth_header.split(" ")[1] if " " in auth_header else auth_header
+            if token_str.startswith("sk-"):
+                # Direct sk- token passed, use it as embedded_key
+                embedded_key = token_str
+            else:
+                # Try to decode JWT
+                try:
+                    token_decoded = jwt.decode(token_str, master_key, algorithms=["HS256"])
+                    embedded_key = token_decoded.get("key")
+                except Exception as decode_err:
+                    # If decoded was set earlier, use it
+                    if decoded:
+                        embedded_key = decoded.get("key")
             
             if embedded_key and embedded_key.startswith("sk-"):
                 hashed_embedded_key = _hash_token_if_needed(embedded_key)
@@ -9345,6 +9363,8 @@ async def claim_onboarding_link(data: InvitationClaim, request: Request):
                 
         except Exception as e:
             verbose_proxy_logger.error(f"Failed to delete onboarding token: {str(e)}")
+            import traceback
+            verbose_proxy_logger.error(f"Traceback: {traceback.format_exc()}")
             # Don't fail the password update if token deletion fails
 
     return user_obj

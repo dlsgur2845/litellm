@@ -147,7 +147,8 @@ RUN pip install --no-index --find-links=/wheels/ -r requirements.txt && \
 RUN chmod +x docker/entrypoint.sh docker/prod_entrypoint.sh && \
     mkdir -p /nonexistent /.npm /tmp/litellm_assets /tmp/litellm_ui && \
     addgroup -g 1000 appgrp && adduser -u 1000 -G appgrp -D appusr && \
-    chown -R appusr:appgrp /app /tmp/litellm_ui /tmp/litellm_assets /nonexistent /.npm && \
+    mkdir -p /var/log/litellm && \
+    chown -R appusr:appgrp /app /tmp/litellm_ui /tmp/litellm_assets /nonexistent /.npm /var/log/litellm && \
     pip uninstall jwt -y || true && \
     pip uninstall PyJWT -y || true && \
     pip install --no-index --find-links=/wheels/ PyJWT==2.10.1 --no-cache-dir && \

@@ -222,11 +222,11 @@ router_settings:
 | use_client_credentials_pass_through_routes | boolean | If true, uses client credentials for all pass-through routes. [Doc on pass through routes](pass_through) |
 | health_check_details | boolean | If false, hides health check details (e.g. remaining rate limit). [Doc on health checks](health) |
 | public_routes | List[str] | (Enterprise Feature) Control list of public routes |
-| alert_types | List[str] | Control list of alert types to send to slack (Doc on alert types)[./alerting.md] |
+| alert_types | List[str] | Control list of alert types to send to slack [Doc on alert types](./alerting.md) |
 | enforced_params | List[str] | (Enterprise Feature) List of params that must be included in all requests to the proxy |
 | enable_oauth2_auth | boolean | (Enterprise Feature) If true, enables oauth2.0 authentication |
 | use_x_forwarded_for | str | If true, uses the X-Forwarded-For header to get the client IP address |
-| service_account_settings | List[Dict[str, Any]] | Set `service_account_settings` if you want to create settings that only apply to service account keys (Doc on service accounts)[./service_accounts.md] | 
+| service_account_settings | List[Dict[str, Any]] | Set `service_account_settings` if you want to create settings that only apply to service account keys [Doc on service accounts](./service_accounts.md) |
 | image_generation_model | str | The default model to use for image generation - ignores model set in request |
 | store_model_in_db | boolean | If true, enables storing model + credential information in the DB. |
 | supported_db_objects | List[str] | Fine-grained control over which object types to load from the database when `store_model_in_db` is True. Available types: `"models"`, `"mcp"`, `"guardrails"`, `"vector_stores"`, `"pass_through_endpoints"`, `"prompts"`, `"model_cost_map"`. If not set, all object types are loaded (default behavior). Example: `supported_db_objects: ["mcp"]` to only load MCP servers from DB. |
@@ -252,19 +252,20 @@ router_settings:
 | custom_sso | str | Path to a python file that implements custom SSO logic. [Doc on custom SSO](./custom_sso.md) |
 | allow_client_side_credentials | boolean | If true, allows passing client side credentials to the proxy. (Useful when testing finetuning models) [Doc on client side credentials](./virtual_keys.md#client-side-credentials) |
 | admin_only_routes | List[str] | (Enterprise Feature) List of routes that are only accessible to admin users. [Doc on admin only routes](./enterprise#control-available-public-private-routes) |
-| use_azure_key_vault | boolean | If true, load keys from azure key vault | 
+| use_azure_key_vault | boolean | If true, load keys from azure key vault |
 | use_google_kms | boolean | If true, load keys from google kms |
 | spend_report_frequency | str | Specify how often you want a Spend Report to be sent (e.g. "1d", "2d", "30d") [More on this](./alerting.md#spend-report-frequency) |
 | ui_access_mode | Literal["admin_only"] | If set, restricts access to the UI to admin users only. [Docs](./ui.md#restrict-ui-access) |
 | litellm_jwtauth | Dict[str, Any] | Settings for JWT authentication. [Docs](./token_auth.md) |
 | litellm_license | str | The license key for the proxy. [Docs](../enterprise.md#how-does-deployment-with-enterprise-license-work) |
-| oauth2_config_mappings | Dict[str, str] | Define the OAuth2 config mappings | 
+| oauth2_config_mappings | Dict[str, str] | Define the OAuth2 config mappings |
 | pass_through_endpoints | List[Dict[str, Any]] | Define the pass through endpoints. [Docs](./pass_through) |
 | enable_oauth2_proxy_auth | boolean | (Enterprise Feature) If true, enables oauth2.0 authentication |
 | forward_openai_org_id | boolean | If true, forwards the OpenAI Organization ID to the backend LLM call (if it's OpenAI). |
 | forward_client_headers_to_llm_api | boolean | If true, forwards the client headers (any `x-` headers and `anthropic-beta` headers) to the backend LLM call |
 | maximum_spend_logs_retention_period               | str                   | Used to set the max retention time for spend logs in the db, after which they will be auto-purged                                                                                                                                                                                                                             |
 | maximum_spend_logs_retention_interval | str | Used to set the interval in which the spend log cleanup task should run in.                                                                                                                                                                                                                                                   |
+
 ### router_settings - Reference
 
 :::info
@@ -318,7 +319,7 @@ router_settings:
 | allowed_fails | integer | The number of failures allowed before cooling down a model. [More information here](reliability) |
 | allowed_fails_policy | object | Specifies the number of allowed failures for different error types before cooling down a deployment. [More information here](reliability) |
 | default_max_parallel_requests | Optional[int] | The default maximum number of parallel requests for a deployment. |
-| default_priority | (Optional[int]) | The default priority for a request. Only for '.scheduler_acompletion()'. Default is None. | 
+| default_priority | (Optional[int]) | The default priority for a request. Only for '.scheduler_acompletion()'. Default is None. |
 | polling_interval | (Optional[float]) | frequency of polling queue. Only for '.scheduler_acompletion()'. Default is 3ms. |
 | max_fallbacks | Optional[int] | The maximum number of fallbacks to try before exiting the call. Defaults to 5. |
 | default_litellm_params | Optional[dict] | The default litellm parameters to add to all requests (e.g. `temperature`, `max_tokens`). |
@@ -347,7 +348,6 @@ router_settings:
 | ignore_invalid_deployments | boolean | If true, ignores invalid deployments. Default for proxy is True - to prevent invalid models from blocking other models from being loaded. |
 | search_tools | List[SearchToolTypedDict] | List of search tool configurations for Search API integration. Each tool specifies a search_tool_name and litellm_params with search_provider, api_key, api_base, etc. [Further Docs](../search.md) |
 | guardrail_list | List[GuardrailTypedDict] | List of guardrail configurations for guardrail load balancing. Enables load balancing across multiple guardrail deployments with the same guardrail_name. [Further Docs](./guardrails/guardrail_load_balancing.md) |
-
 
 ### environment variables - Reference
 
@@ -383,7 +383,7 @@ router_settings:
 | AUTO_REDIRECT_UI_LOGIN_TO_SSO | Flag to enable automatic redirect of UI login page to SSO when SSO is configured. Default is **true**
 | AUDIO_SPEECH_CHUNK_SIZE | Chunk size for audio speech processing. Default is 1024
 | ANTHROPIC_API_KEY | API key for Anthropic service
-| ANTHROPIC_API_BASE | Base URL for Anthropic API. Default is https://api.anthropic.com
+| ANTHROPIC_API_BASE | Base URL for Anthropic API. Default is <https://api.anthropic.com>
 | AWS_ACCESS_KEY_ID | Access Key ID for AWS services
 | AWS_BATCH_ROLE_ARN | ARN of the AWS IAM role for batch operations
 | AWS_DEFAULT_REGION | Default AWS region for service interactions when AWS_REGION is not set
@@ -413,7 +413,7 @@ router_settings:
 | AZURE_PASSWORD | Password for Azure services, use in conjunction with AZURE_USERNAME for azure ad token with basic username/password workflow
 | AZURE_FEDERATED_TOKEN_FILE | File path to Azure federated token
 | AZURE_FILE_SEARCH_COST_PER_GB_PER_DAY | Cost per GB per day for Azure File Search service
-| AZURE_SCOPE | For EntraID Auth, Scope for Azure services, defaults to "https://cognitiveservices.azure.com/.default"
+| AZURE_SCOPE | For EntraID Auth, Scope for Azure services, defaults to "<https://cognitiveservices.azure.com/.default>"
 | AZURE_SENTINEL_DCR_IMMUTABLE_ID | Immutable ID of the Data Collection Rule for Azure Sentinel logging
 | AZURE_SENTINEL_STREAM_NAME | Stream name for Azure Sentinel logging
 | AZURE_SENTINEL_CLIENT_SECRET | Client secret for Azure Sentinel authentication
@@ -434,7 +434,7 @@ router_settings:
 | BEDROCK_MAX_POLICY_SIZE | Maximum size for Bedrock policy. Default is 75
 | BERRISPEND_ACCOUNT_ID | Account ID for BerriSpend service
 | BRAINTRUST_API_KEY | API key for Braintrust integration
-| BRAINTRUST_API_BASE | Base URL for Braintrust API. Default is https://api.braintrustdata.com/v1
+| BRAINTRUST_API_BASE | Base URL for Braintrust API. Default is <https://api.braintrustdata.com/v1>
 | CACHED_STREAMING_CHUNK_DELAY | Delay in seconds for cached streaming chunks. Default is 0.02
 | CIRCLE_OIDC_TOKEN | OpenID Connect token for CircleCI
 | CIRCLE_OIDC_TOKEN_V2 | Version 2 of the OpenID Connect token for CircleCI
@@ -454,7 +454,7 @@ router_settings:
 | CONFIDENT_API_KEY | API key for DeepEval integration
 | CUSTOM_TIKTOKEN_CACHE_DIR | Custom directory for Tiktoken cache
 | CONFIDENT_API_KEY | API key for Confident AI (Deepeval) Logging service
-| COHERE_API_BASE | Base URL for Cohere API. Default is https://api.cohere.com
+| COHERE_API_BASE | Base URL for Cohere API. Default is <https://api.cohere.com>
 | DATABASE_HOST | Hostname for the database server
 | DATABASE_NAME | Name of the database
 | DATABASE_PASSWORD | Password for the database user
@@ -468,7 +468,7 @@ router_settings:
 | DAYS_IN_A_WEEK | Days in a week for calculation purposes. Default is 7
 | DAYS_IN_A_YEAR | Days in a year for calculation purposes. Default is 365
 | DYNAMOAI_API_KEY | API key for DynamoAI Guardrails service
-| DYNAMOAI_API_BASE | Base URL for DynamoAI API. Default is https://api.dynamo.ai
+| DYNAMOAI_API_BASE | Base URL for DynamoAI API. Default is <https://api.dynamo.ai>
 | DYNAMOAI_MODEL_ID | Model ID for DynamoAI tracking/logging purposes
 | DYNAMOAI_POLICY_IDS | Comma-separated list of DynamoAI policy IDs to apply
 | DD_BASE_URL | Base URL for Datadog integration
@@ -552,11 +552,11 @@ router_settings:
 | EMAIL_BUDGET_ALERT_MAX_SPEND_ALERT_PERCENTAGE | Maximum spend percentage for triggering email budget alerts
 | EMAIL_SUPPORT_CONTACT | Support contact email address
 | EMAIL_SIGNATURE | Custom HTML footer/signature for all emails. Can include HTML tags for formatting and links.
-| EMAIL_SUBJECT_INVITATION | Custom subject template for invitation emails. 
-| EMAIL_SUBJECT_KEY_CREATED | Custom subject template for key creation emails. 
+| EMAIL_SUBJECT_INVITATION | Custom subject template for invitation emails.
+| EMAIL_SUBJECT_KEY_CREATED | Custom subject template for key creation emails.
 | EMAIL_BUDGET_ALERT_MAX_SPEND_ALERT_PERCENTAGE | Percentage of max budget that triggers alerts (as decimal: 0.8 = 80%). Default is 0.8
 | EMAIL_BUDGET_ALERT_TTL | Time-to-live for budget alert deduplication in seconds. Default is 86400 (24 hours)
-| ENKRYPTAI_API_BASE | Base URL for EnkryptAI Guardrails API. **Default is https://api.enkryptai.com**
+| ENKRYPTAI_API_BASE | Base URL for EnkryptAI Guardrails API. **Default is <https://api.enkryptai.com>**
 | ENKRYPTAI_API_KEY | API key for EnkryptAI Guardrails service
 | EXPERIMENTAL_MULTI_INSTANCE_RATE_LIMITING | Flag to enable new multi-instance rate limiting. **Default is False**
 | FIREWORKS_AI_4_B | Size parameter for Fireworks AI 4B model. Default is 4
@@ -595,7 +595,7 @@ router_settings:
 | GENERIC_USERINFO_ENDPOINT | Endpoint to fetch user information in generic OAuth
 | GENERIC_LOGGER_ENDPOINT | Endpoint URL for the Generic Logger callback to send logs to
 | GENERIC_LOGGER_HEADERS | JSON string of headers to include in Generic Logger callback requests
-| GEMINI_API_BASE | Base URL for Gemini API. Default is https://generativelanguage.googleapis.com
+| GEMINI_API_BASE | Base URL for Gemini API. Default is <https://generativelanguage.googleapis.com>
 | GALILEO_BASE_URL | Base URL for Galileo platform
 | GALILEO_PASSWORD | Password for Galileo authentication
 | GALILEO_PROJECT_ID | Project ID for Galileo usage
@@ -605,7 +605,7 @@ router_settings:
 | GITHUB_COPILOT_ACCESS_TOKEN_FILE | File to store GitHub Copilot access token for `github_copilot` llm provider
 | GREENSCALE_API_KEY | API key for Greenscale service
 | GREENSCALE_ENDPOINT | Endpoint URL for Greenscale service
-| GRAYSWAN_API_BASE | Base URL for GraySwan API. Default is https://api.grayswan.ai
+| GRAYSWAN_API_BASE | Base URL for GraySwan API. Default is <https://api.grayswan.ai>
 | GRAYSWAN_API_KEY | API key for GraySwan Cygnal service
 | GRAYSWAN_REASONING_MODE | Reasoning mode for GraySwan guardrail
 | GRAYSWAN_VIOLATION_THRESHOLD | Violation threshold for GraySwan guardrail
@@ -694,10 +694,13 @@ router_settings:
 | LITELLM_LICENSE | License key for LiteLLM usage
 | LITELLM_LOCAL_MODEL_COST_MAP | Local configuration for model cost mapping in LiteLLM
 | LITELLM_LOG | Enable detailed logging for LiteLLM
-| LITELLM_MODEL_COST_MAP_URL | URL for fetching model cost map data. Default is https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
-| LITELLM_LOG_FILE | File path to write LiteLLM logs to. When set, logs will be written to both console and the specified file
-| LITELLM_LOGGER_NAME | Name for OTEL logger 
-| LITELLM_METER_NAME | Name for OTEL Meter 
+| LITELLM_MODEL_COST_MAP_URL | URL for fetching model cost map data. Default is <https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json>
+| LITELLM_LOG_FILE | File path to write LiteLLM logs to. When set, logs will be written to both console and the specified file. Supports log rotation via `LITELLM_LOG_ROTATION_DAYS` and `LITELLM_LOG_RETENTION_DAYS`.
+| LITELLM_LOG_ROTATION_DAYS | Number of days between log file rotations. Default is 1 (daily rotation at midnight). Only applies when `LITELLM_LOG_FILE` is set.
+| LITELLM_LOG_RETENTION_DAYS | Number of days to retain rotated log files. Default is 14 (2 weeks). Only applies when `LITELLM_LOG_FILE` is set.
+| LITELLM_LOG_TIMEZONE | Timezone for log timestamps (IANA timezone format, e.g., 'Asia/Seoul', 'UTC', 'America/New_York'). Default is 'Asia/Seoul'. Requires `pytz` package to be installed.
+| LITELLM_LOGGER_NAME | Name for OTEL logger
+| LITELLM_METER_NAME | Name for OTEL Meter
 | LITELLM_OTEL_INTEGRATION_ENABLE_EVENTS | Optionally enable semantic logs for OTEL
 | LITELLM_OTEL_INTEGRATION_ENABLE_METRICS | Optionally enable emantic metrics for OTEL
 | LITELLM_MASTER_KEY | Master key for proxy authentication
@@ -714,11 +717,11 @@ router_settings:
 | LOGGING_WORKER_CONCURRENCY | Maximum number of concurrent coroutine slots for the logging worker on the asyncio event loop. Default is 100. Setting too high will flood the event loop with logging tasks which will lower the overall latency of the requests.
 | LOGGING_WORKER_MAX_QUEUE_SIZE | Maximum size of the logging worker queue. When the queue is full, the worker aggressively clears tasks to make room instead of dropping logs. Default is 50,000
 | LOGGING_WORKER_MAX_TIME_PER_COROUTINE | Maximum time in seconds allowed for each coroutine in the logging worker before timing out. Default is 20.0
-| LOGGING_WORKER_CLEAR_PERCENTAGE | Percentage of the queue to extract when clearing. Default is 50% 
+| LOGGING_WORKER_CLEAR_PERCENTAGE | Percentage of the queue to extract when clearing. Default is 50%
 | MAX_EXCEPTION_MESSAGE_LENGTH | Maximum length for exception messages. Default is 2000
 | MAX_ITERATIONS_TO_CLEAR_QUEUE | Maximum number of iterations to attempt when clearing the logging worker queue during shutdown. Default is 200
 | MAX_TIME_TO_CLEAR_QUEUE | Maximum time in seconds to spend clearing the logging worker queue during shutdown. Default is 5.0
-| LOGGING_WORKER_AGGRESSIVE_CLEAR_COOLDOWN_SECONDS | Cooldown time in seconds before allowing another aggressive clear operation when the queue is full. Default is 0.5 
+| LOGGING_WORKER_AGGRESSIVE_CLEAR_COOLDOWN_SECONDS | Cooldown time in seconds before allowing another aggressive clear operation when the queue is full. Default is 0.5
 | MAX_STRING_LENGTH_PROMPT_IN_DB | Maximum length for strings in spend logs when sanitizing request bodies. Strings longer than this will be truncated. Default is 1000
 | MAX_IN_MEMORY_QUEUE_FLUSH_COUNT | Maximum count for in-memory queue flush operations. Default is 1000
 | MAX_LONG_SIDE_FOR_IMAGE_HIGH_RES | Maximum length for the long side of high-resolution images. Default is 2000
@@ -736,7 +739,7 @@ router_settings:
 | MAX_LANGFUSE_INITIALIZED_CLIENTS | Maximum number of Langfuse clients to initialize on proxy. Default is 50. This is set since langfuse initializes 1 thread everytime a client is initialized. We've had an incident in the past where we reached 100% cpu utilization because Langfuse was initialized several times.
 | MIN_NON_ZERO_TEMPERATURE | Minimum non-zero temperature value. Default is 0.0001
 | MINIMUM_PROMPT_CACHE_TOKEN_COUNT | Minimum token count for caching a prompt. Default is 1024
-| MISTRAL_API_BASE | Base URL for Mistral API. Default is https://api.mistral.ai
+| MISTRAL_API_BASE | Base URL for Mistral API. Default is <https://api.mistral.ai>
 | MISTRAL_API_KEY | API key for Mistral API
 | MICROSOFT_CLIENT_ID | Client ID for Microsoft services
 | MICROSOFT_CLIENT_SECRET | Client secret for Microsoft services
@@ -748,7 +751,7 @@ router_settings:
 | NON_LLM_CONNECTION_TIMEOUT | Timeout in seconds for non-LLM service connections. Default is 15
 | OAUTH_TOKEN_INFO_ENDPOINT | Endpoint for OAuth token info retrieval
 | OPENAI_BASE_URL | Base URL for OpenAI API
-| OPENAI_API_BASE | Base URL for OpenAI API. Default is https://api.openai.com/
+| OPENAI_API_BASE | Base URL for OpenAI API. Default is <https://api.openai.com/>
 | OPENAI_API_KEY | API key for OpenAI services
 | OPENAI_FILE_SEARCH_COST_PER_1K_CALLS | Cost per 1000 calls for OpenAI file search. Default is 0.0025
 | OPENAI_ORGANIZATION | Organization identifier for OpenAI
@@ -758,7 +761,7 @@ router_settings:
 | OPENMETER_API_ENDPOINT | API endpoint for OpenMeter integration
 | OPENMETER_API_KEY | API key for OpenMeter services
 | OPENMETER_EVENT_TYPE | Type of events sent to OpenMeter
-| ONYX_API_BASE | Base URL for Onyx Security AI Guard service (defaults to https://ai-guard.onyx.security)
+| ONYX_API_BASE | Base URL for Onyx Security AI Guard service (defaults to <https://ai-guard.onyx.security>)
 | ONYX_API_KEY | API key for Onyx Security AI Guard service
 | OTEL_ENDPOINT | OpenTelemetry endpoint for traces
 | OTEL_EXPORTER_OTLP_ENDPOINT | OpenTelemetry endpoint for traces
@@ -779,9 +782,9 @@ router_settings:
 | PILLAR_API_BASE | Base URL for Pillar API Guardrails
 | PILLAR_API_KEY | API key for Pillar API Guardrails
 | PILLAR_ON_FLAGGED_ACTION | Action to take when content is flagged ('block' or 'monitor')
-| POD_NAME | Pod name for the server, this will be [emitted to `datadog` logs](https://docs.litellm.ai/docs/proxy/logging#datadog) as `POD_NAME` 
+| POD_NAME | Pod name for the server, this will be [emitted to `datadog` logs](https://docs.litellm.ai/docs/proxy/logging#datadog) as `POD_NAME`
 | POSTHOG_API_KEY | API key for PostHog analytics integration
-| POSTHOG_API_URL | Base URL for PostHog API (defaults to https://us.i.posthog.com)
+| POSTHOG_API_URL | Base URL for PostHog API (defaults to <https://us.i.posthog.com>)
 | PREDIBASE_API_BASE | Base URL for Predibase API
 | PRESIDIO_ANALYZER_API_BASE | Base URL for Presidio Analyzer service
 | PRESIDIO_ANONYMIZER_API_BASE | Base URL for Presidio Anonymizer service
@@ -839,7 +842,7 @@ router_settings:
 | SMTP_USERNAME | Username for SMTP authentication (do not set if SMTP does not require auth)
 | SENDGRID_API_KEY | API key for SendGrid email service
 | RESEND_API_KEY | API key for Resend email service
-| SENDGRID_SENDER_EMAIL | Email address used as the sender in SendGrid email transactions 
+| SENDGRID_SENDER_EMAIL | Email address used as the sender in SendGrid email transactions
 | SPEND_LOGS_URL | URL for retrieving spend logs
 | SPEND_LOG_CLEANUP_BATCH_SIZE | Number of logs deleted per batch during cleanup. Default is 1000
 | SSL_CERTIFICATE | Path to the SSL certificate file
@@ -849,7 +852,7 @@ router_settings:
 | SSL_CERT_FILE | Path to the SSL certificate file for custom CA bundle
 | SUPABASE_KEY | API key for Supabase service
 | SUPABASE_URL | Base URL for Supabase instance
-| STORE_MODEL_IN_DB | If true, enables storing model + credential information in the DB. 
+| STORE_MODEL_IN_DB | If true, enables storing model + credential information in the DB.
 | SYSTEM_MESSAGE_TOKEN_COUNT | Token count for system messages. Default is 4
 | TEST_EMAIL_ADDRESS | Email address used for testing purposes
 | TOGETHER_AI_4_B | Size parameter for Together AI 4B model. Default is 4
@@ -884,4 +887,4 @@ router_settings:
 | DEFAULT_SHARED_HEALTH_CHECK_LOCK_TTL | Time-to-live in seconds for health check lock in shared health check mode. Default is 60 (1 minute)
 | ZSCALER_AI_GUARD_API_KEY | API key for Zscaler AI Guard service
 | ZSCALER_AI_GUARD_POLICY_ID | Policy ID for Zscaler AI Guard guardrails
-| ZSCALER_AI_GUARD_URL | Base URL for Zscaler AI Guard API. Default is https://api.us1.zseclipse.net/v1/detection/execute-policy
+| ZSCALER_AI_GUARD_URL | Base URL for Zscaler AI Guard API. Default is <https://api.us1.zseclipse.net/v1/detection/execute-policy>

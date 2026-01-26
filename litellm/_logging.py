@@ -2,8 +2,15 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, time
 from logging import Formatter
+from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
+
+try:
+    import pytz
+except ImportError:
+    pytz = None  # pytz를 사용할 수 없는 경우 None으로 설정
 
 set_verbose = False
 
@@ -19,13 +26,47 @@ handler = logging.StreamHandler()
 handler.setLevel(numeric_level)
 
 
+class TimezoneFormatter(Formatter):
+    """Formatter that supports timezone-aware timestamps"""
+    
+    def __init__(self, fmt=None, datefmt=None, tz=None):
+        super().__init__(fmt, datefmt)
+        if pytz and tz:
+            try:
+                self.tz = pytz.timezone(tz) if isinstance(tz, str) else tz
+            except Exception:
+                self.tz = None
+        else:
+            self.tz = None
+    
+    def formatTime(self, record, datefmt=None):
+        if self.tz and pytz:
+            dt = datetime.fromtimestamp(record.created, tz=self.tz)
+        else:
+            dt = datetime.fromtimestamp(record.created)
+        
+        if datefmt:
+            return dt.strftime(datefmt)
+        return dt.isoformat()
+
+
 class JsonFormatter(Formatter):
-    def __init__(self):
+    def __init__(self, tz=None):
         super(JsonFormatter, self).__init__()
+        if pytz and tz:
+            try:
+                self.tz = pytz.timezone(tz) if isinstance(tz, str) else tz
+            except Exception:
+                self.tz = None
+        else:
+            self.tz = None
 
     def formatTime(self, record, datefmt=None):
         # Use datetime to format the timestamp in ISO 8601 format
-        dt = datetime.fromtimestamp(record.created)
+        if self.tz and pytz:
+            dt = datetime.fromtimestamp(record.created, tz=self.tz)
+        else:
+            dt = datetime.fromtimestamp(record.created)
         return dt.isoformat()
 
     def format(self, record):
@@ -107,6 +148,60 @@ verbose_logger = logging.getLogger("LiteLLM")
 verbose_router_logger.addHandler(handler)
 verbose_proxy_logger.addHandler(handler)
 verbose_logger.addHandler(handler)
+
+
+# File logging configuration
+log_file_path = os.getenv("LITELLM_LOG_FILE")
+if log_file_path:
+    try:
+        # Load file logging configuration
+        log_rotation_days = int(os.getenv("LITELLM_LOG_ROTATION_DAYS", "1"))
+        log_retention_days = int(os.getenv("LITELLM_LOG_RETENTION_DAYS", "14"))
+        log_timezone = os.getenv("LITELLM_LOG_TIMEZONE", "Asia/Seoul")
+        
+        # Validate timezone
+        tz = None
+        if pytz:
+            try:
+                tz = pytz.timezone(log_timezone)
+            except Exception:
+                tz = pytz.timezone("Asia/Seoul")  # Fallback to default
+        
+        # Create log directory if it doesn't exist
+        log_dir = Path(log_file_path).parent
+        log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create TimedRotatingFileHandler
+        file_handler = TimedRotatingFileHandler(
+            filename=log_file_path,
+            when='midnight',
+            interval=log_rotation_days,
+            backupCount=log_retention_days,
+            encoding='utf-8',
+            atTime=time(0, 0, 0)  # Rotate at midnight
+        )
+        file_handler.setLevel(numeric_level)
+        
+        # Apply formatter with timezone support
+        if json_logs:
+            file_handler.setFormatter(JsonFormatter(tz=log_timezone if pytz else None))
+        else:
+            file_formatter = TimezoneFormatter(
+                fmt="\033[92m%(asctime)s - %(name)s:%(levelname)s\033[0m: %(filename)s:%(lineno)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+                tz=log_timezone if pytz else None
+            )
+            file_handler.setFormatter(file_formatter)
+        
+        # Add file handler to all loggers
+        verbose_logger.addHandler(file_handler)
+        verbose_router_logger.addHandler(file_handler)
+        verbose_proxy_logger.addHandler(file_handler)
+        logging.getLogger().addHandler(file_handler)
+        
+    except Exception as e:
+        # Log error but don't fail if file logging setup fails
+        logging.warning(f"Failed to setup file logging: {e}")
 
 
 def _suppress_loggers():
